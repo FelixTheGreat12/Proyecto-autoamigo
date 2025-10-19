@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "379621009255",
+    "project_id": "autoamigo-fa173",
+    "storage_bucket": "autoamigo-fa173.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:379621009255:android:438c3ba1cee5b9a457f1c2",
+        "android_client_info": {
+          "package_name": "com.example.autoamigo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbSvVoh7ma_-O1UfwQMvREx9B6MDDVS-o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
