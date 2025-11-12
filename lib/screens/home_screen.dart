@@ -65,6 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icons.directions_car_outlined,
               title: 'Mis Autos',
               subtitle: 'Updated today',
+              onTap: () => Navigator.pushNamed(context, '/mis_autos'),
             ),
             _buildMenuItem(
               icon: Icons.history_outlined,
@@ -119,15 +120,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Widget auxiliar para crear cada ítem del menú y evitar repetir código.
-  Widget _buildMenuItem({required IconData icon, required String title, required String subtitle}) {
+  Widget _buildMenuItem({required IconData icon, required String title, required String subtitle, VoidCallback? onTap}) {
     return Card(
       elevation: 2.0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15.0),
       ),
       child: InkWell(
-        onTap: () {
-          // Lógica para cuando se presiona un ítem del menú
+        onTap: onTap ?? () {
+          // Lógica por defecto para cuando se presiona un ítem del menú
           print('$title presionado');
         },
         borderRadius: BorderRadius.circular(15.0),

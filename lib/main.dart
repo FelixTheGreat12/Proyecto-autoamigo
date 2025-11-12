@@ -5,6 +5,8 @@ import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/mis_autos_screen.dart';
+import 'screens/cotizar_auto_screen.dart';
 import 'auth/auth_service.dart';
 
 void main() async {
@@ -31,6 +33,8 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LoginScreen(),
         '/register': (context) => RegisterScreen(),
         '/home': (context) => HomeScreen(),
+        '/mis_autos': (context) => MisAutosScreen(),
+  '/cotizar_auto': (context) => CotizarAutoScreen(),
       },
     );
   }
