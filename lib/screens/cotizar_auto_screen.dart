@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CotizarAutoScreen extends StatefulWidget {
   const CotizarAutoScreen({super.key});
@@ -11,10 +13,27 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
   String? selectedYear;
   String? selectedBrand;
   String? selectedModel;
+  // Años limitados 2024..2016
+  final years = List<String>.generate(9, (i) => '${2024 - i}');
 
-  final years = List<String>.generate(30, (i) => '${DateTime.now().year - i}');
-  final brands = ['Toyota', 'Honda', 'Nissan', 'Ford'];
-  final models = ['Modelo A', 'Modelo B', 'Modelo C'];
+  // Marcas y modelos predefinidos
+  final Map<String, List<String>> brandsWithModels = {
+    'Nissan': ['March', 'Versa', 'Sentra'],
+    'Volkswagen': ['Jetta', 'Vento', 'Gol'],
+    'Kia': ['Picanto', 'Rio', 'K3'],
+    'Chevrolet': ['Spark', 'Beat', 'Aveo'],
+    'Hyundai': ['Grand i10', 'Accent', 'i10', 'i20'],
+    'Ford': ['Figo', 'Fiesta', 'Focus'],
+    'Toyota': ['Yaris', 'Corolla', 'Avanza'],
+    'Honda': ['City', 'Civic', 'Fit'],
+  };
+
+  List<String> get brands => brandsWithModels.keys.toList();
+
+  List<String> get models {
+    if (selectedBrand == null) return [];
+    return brandsWithModels[selectedBrand] ?? [];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -139,21 +158,54 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     );
   }
 
+  Future<void> _saveCotizacionToFirebase() async {
+    // Validar que todos los campos estén completos
+    if (selectedYear == null || selectedBrand == null || selectedModel == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor completa todos los campos')),
+      );
+      return;
+    }
+
+    // Obtener ID del usuario actual
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Usuario no autenticado')),
+      );
+      return;
+    }
+
+    try {
+      // Guardar cotización en Firestore
+      await FirebaseFirestore.instance.collection('autos').add({
+        'year': selectedYear,
+        'brand': selectedBrand,
+        'model': selectedModel,
+        'userId': userId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'cotizado',
+      });
+
+      // Navegar a la pantalla de documentos
+      Navigator.pushNamed(context, '/documentos_requeridos');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar: $e')),
+      );
+    }
+  }
+
   Widget _buildCotizarButton() {
     return ElevatedButton(
-      onPressed: () {
-        // Interfaz solamente: no acción
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Interfaz: acción de cotizar (solo UI).')),
-        );
-      },
+      onPressed: _saveCotizacionToFirebase,
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.grey[300],
         foregroundColor: Colors.black,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
-      child: const Text('Cotizar auto'),
+      child: const Text('Registrar auto'),
     );
   }
 }
