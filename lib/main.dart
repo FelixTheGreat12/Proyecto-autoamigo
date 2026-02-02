@@ -9,7 +9,7 @@ import 'screens/home_screen.dart';
 import 'screens/mis_autos_screen.dart';
 import 'screens/cotizar_auto_screen.dart';
 import 'screens/documentos_requeridos_screen.dart';
-import 'screens/product_car_screen.dart';
+// import 'screens/product_car_screen.dart';
 import 'auth/auth_service.dart';
 
 void main() async {
@@ -41,12 +41,12 @@ class MyApp extends StatelessWidget {
       home: AuthWrapper(), // Usamos un Wrapper para decidir qué pantalla mostrar
       routes: {
         '/login': (context) => LoginScreen(),
-        '/register': (context) => RegisterScreen(),
+        '/register': (context) => const RegisterScreen(),
         '/home': (context) => HomeScreen(),
-        '/mis_autos': (context) => MisAutosScreen(),
-        '/cotizar_auto': (context) => CotizarAutoScreen(),
-        '/documentos_requeridos': (context) => const DocumentosRequeridosScreen(),
-        '/product_car': (context) => const ProductCarScreen(),
+        '/mis_autos': (context) => const  MisAutosScreen(),
+        '/cotizar_auto': (context) => const CotizarAutoScreen(),
+        //'/documentos_requeridos': (context) => const DocumentosRequeridosScreen(),
+        //'/product_car': (context) => const ProductCarScreen(),
       },
     );
   }
