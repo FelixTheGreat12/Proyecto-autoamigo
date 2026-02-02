@@ -1,160 +1,280 @@
 import 'package:autoamigo/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 
-
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
-  int _selectedIndex = 0; // Para controlar el ítem seleccionado en la barra inferior
+  int _selectedIndex = 0;
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
-    // Aquí puedes añadir la lógica para navegar a otras pantallas
-    // basadas en el índice seleccionado. Por ahora, solo cambia el estado.
+
+    // --- LÓGICA DE NAVEGACIÓN ---
+    switch (index) {
+      case 0:
+        // Ya estamos en Home (Rentar Auto)
+        break;
+      case 1:
+        // Opción: Publicar Autos -> Ir a Cotizar
+        Navigator.pushNamed(context, '/cotizar_auto');
+        break;
+      case 2:
+        // Opción: Localizar Autos
+        // Navigator.pushNamed(context, '/localizar'); // Pendiente
+        break;
+      case 3:
+        // Opción: Perfil
+        // Navigator.pushNamed(context, '/perfil'); // Pendiente
+        break;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA), // Fondo gris azulado suave
       appBar: AppBar(
-        title: Text('Menú de Inicio'),
-        automaticallyImplyLeading: false, // Oculta la flecha de retroceso
-        elevation: 1,
+        backgroundColor: Colors.white,
+        title: const Text(
+          'AutoAmigo',
+          style: TextStyle(
+            color: Color(0xFF1565C0), // Azul corporativo
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+          ),
+        ),
+        centerTitle: false,
+        automaticallyImplyLeading: false,
+        elevation: 0,
         actions: [
-          // Botón de Logout (Cerrar Sesión)
-          IconButton(
-            icon: Icon(Icons.logout),
-            onPressed: () async {
-              await _authService.signOut();
-              Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-            },
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: IconButton(
+              onPressed: () async {
+                await _authService.signOut();
+                if (!mounted) return;
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+              tooltip: 'Cerrar sesión',
+            ),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(4.0),
-        // GridView para mostrar las opciones del menú
-        child: GridView.count(
-          crossAxisCount: 3, // 3 columnas
-          crossAxisSpacing: 12, // Espacio horizontal entre ítems
-          mainAxisSpacing: 12,  // Espacio vertical entre ítems
-          children: <Widget>[
-            // Aquí creamos cada uno de los botones del menú
-            _buildMenuItem(
-              icon: Icons.person_outline,
-              title: 'Arrendatario',
-              subtitle: 'Documentos',
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Banner de bienvenida
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(30),
+                bottomRight: Radius.circular(30),
+              ),
             ),
-            _buildMenuItem(
-              icon: Icons.business_center_outlined,
-              title: 'Arrendador',
-              subtitle: 'Documentos',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Bienvenido',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '¿Qué deseas hacer hoy?',
+                  style: TextStyle(
+                    color: Color(0xFF263238),
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            _buildMenuItem(
-              icon: Icons.payment_outlined,
-              title: 'Forma de pago',
-              subtitle: 'Updated 2 days ago',
+          ),
+          const SizedBox(height: 20),
+          // Grid de opciones
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: GridView.count(
+                crossAxisCount: 2, // 2 columnas para mejor visibilidad
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1.1,
+                children: <Widget>[
+                  _buildMenuItem(
+                    icon: Icons.directions_car_filled_outlined,
+                    title: 'Mis Autos',
+                    subtitle: 'Gestionar flota',
+                    color: Colors.blueAccent,
+                    onTap: () {
+                      Navigator.pushNamed(context, '/mis_autos');
+                    },
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.person_outline,
+                    title: 'Arrendatario',
+                    subtitle: 'Mis documentos',
+                    color: Colors.orangeAccent,
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.business_center_outlined,
+                    title: 'Arrendador',
+                    subtitle: 'Mis documentos',
+                    color: Colors.teal,
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.payment_outlined,
+                    title: 'Pagos',
+                    subtitle: 'Métodos de pago',
+                    color: Colors.green,
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.history_rounded,
+                    title: 'Historial',
+                    subtitle: 'Rentas pasadas',
+                    color: Colors.purpleAccent,
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.notifications_active_outlined,
+                    title: 'Avisos',
+                    subtitle: 'Notificaciones',
+                    color: Colors.redAccent,
+                  ),
+                ],
+              ),
             ),
-            _buildMenuItem(
-              icon: Icons.directions_car_outlined,
-              title: 'Mis Autos',
-              subtitle: 'Updated today',
-              onTap: () => Navigator.pushNamed(context, '/mis_autos'),
-            ),
-            _buildMenuItem(
-              icon: Icons.history_outlined,
-              title: 'Historial',
-              subtitle: 'Updated yesterday',
-            ),
-            _buildMenuItem(
-              icon: Icons.notifications_outlined,
-              title: 'Notificaciones',
-              subtitle: 'Updated 2 days ago',
-            ),
-             _buildMenuItem(
-              icon: Icons.settings_outlined,
-              title: 'Configuración',
-              subtitle: 'Updated today',
-            ),
-             _buildMenuItem(
-              icon: Icons.help_outline,
-              title: 'Ayuda',
-              subtitle: 'Updated yesterday',
+          ),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
             ),
           ],
         ),
-      ),
-      // Barra de Navegación Inferior
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.star_border),
-            label: 'Rentar Auto',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.publish_outlined),
-            label: 'Publicar Autos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.location_on_outlined),
-            label: 'Localizar Autos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.blue[800], // Color del ítem activo
-        unselectedItemColor: Colors.grey[600], // Color de los ítems inactivos
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed, // Mantiene el layout fijo
+        child: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_filled),
+              label: 'Inicio',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.add_circle_outline),
+              label: 'Cotizar',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.map_outlined),
+              label: 'Localizar',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              label: 'Perfil',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          // Mantenemos tu preferencia de no iluminar
+          selectedItemColor: Colors.grey[800],
+          unselectedItemColor: Colors.grey[600],
+          showUnselectedLabels: true,
+          onTap: _onItemTapped,
+          type: BottomNavigationBarType.fixed,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+        ),
       ),
     );
   }
 
-  /// Widget auxiliar para crear cada ítem del menú y evitar repetir código.
-  Widget _buildMenuItem({required IconData icon, required String title, required String subtitle, VoidCallback? onTap}) {
-    return Card(
-      elevation: 2.0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15.0),
-      ),
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20.0),
+      elevation: 0, // Flat design con sombra suave
       child: InkWell(
-        onTap: onTap ?? () {
-          // Lógica por defecto para cuando se presiona un ítem del menú
-          print('$title presionado');
-        },
-        borderRadius: BorderRadius.circular(15.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Icon(icon, size: 28.0, color: Colors.grey[700]),
-            SizedBox(height: 5.0),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 10.0,
+        onTap: onTap ??
+            () {
+              print('$title presionado');
+            },
+        borderRadius: BorderRadius.circular(20.0),
+        splashColor: color.withOpacity(0.1),
+        highlightColor: color.withOpacity(0.05),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20.0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, size: 28.0, color: color),
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16.0,
+                    color: Color(0xFF263238),
+                  ),
+                ),
+                const SizedBox(height: 4.0),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 12.0, color: Colors.grey[600]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            SizedBox(height: 2.0),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 9.0,
-                color: Colors.grey,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
