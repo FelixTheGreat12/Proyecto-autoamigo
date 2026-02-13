@@ -3,14 +3,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'firebase_options.dart';
-import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/mis_autos_screen.dart';
-import 'screens/cotizar_auto_screen.dart';
-import 'screens/documentos_requeridos_screen.dart';
-// import 'screens/product_car_screen.dart';
-import 'auth/auth_service.dart';
+import 'presentation/screens/login_screen.dart';
+import 'presentation/screens/register_screen.dart';
+import 'presentation/screens/home_screen.dart';
+import 'presentation/screens/mis_autos_screen.dart';
+import 'presentation/screens/cotizar_auto_screen.dart';
+import 'presentation/screens/documentos_requeridos_screen.dart';
+// import 'presentation/screens/product_car_screen.dart';
+import 'infrastructure/auth/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

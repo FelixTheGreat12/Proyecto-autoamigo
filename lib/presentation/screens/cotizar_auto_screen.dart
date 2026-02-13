@@ -22,8 +22,18 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
   String? selectedYear;
   String? selectedBrand;
   String? selectedModel;
+  String? selectedColor;
+  String? selectedTransmission;
 
   final years = List<String>.generate(9, (i) => '${2024 - i}');
+
+  final List<String> colors = [
+    'Blanco', 'Negro', 'Gris', 'Plata', 'Azul', 'Rojo', 'Café', 'Beige', 'Verde', 'Amarillo'
+  ];
+
+  final List<String> transmissions = [
+    'Automática', 'Estándar', 'CVT', 'DSG', 'Tiptronic'
+  ];
 
   final Map<String, List<String>> brandsWithModels = {
     'Nissan': ['March', 'Versa', 'Sentra'],
@@ -51,6 +61,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
       selectedYear = widget.existingData!['year'];
       selectedBrand = widget.existingData!['brand'];
       selectedModel = widget.existingData!['model'];
+      selectedColor = widget.existingData!['color'];
+      selectedTransmission = widget.existingData!['transmission'];
       _plateController.text = widget.existingData!['plate'] ?? '';
     }
   }
@@ -104,6 +116,10 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                       const SizedBox(height: 12),
                       _buildDropdownModel(),
                       const SizedBox(height: 12),
+                      _buildDropdownColor(),
+                      const SizedBox(height: 12),
+                      _buildDropdownTransmission(),
+                      const SizedBox(height: 12),
                       _buildPlateInput(),
                       const SizedBox(height: 16),
                       _buildCotizarButton(isEditing),
@@ -111,17 +127,30 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                   );
                 }
 
-                return Row(
+                // Layout para pantallas anchas
+                return Column(
                   children: [
-                    Expanded(flex: 2, child: _buildDropdownYear()),
-                    const SizedBox(width: 12),
-                    Expanded(flex: 3, child: _buildDropdownBrand()),
-                    const SizedBox(width: 12),
-                    Expanded(flex: 3, child: _buildDropdownModel()),
-                    const SizedBox(width: 12),
-                    Expanded(flex: 2, child: _buildPlateInput()),
-                    const SizedBox(width: 12),
-                    SizedBox(width: 160, child: _buildCotizarButton(isEditing)),
+                    Row(
+                      children: [
+                        Expanded(flex: 2, child: _buildDropdownYear()),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 3, child: _buildDropdownBrand()),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 3, child: _buildDropdownModel()),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: _buildDropdownColor()),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildDropdownTransmission()),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildPlateInput()),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(width: double.infinity, child: _buildCotizarButton(isEditing)),
                   ],
                 );
               },
@@ -202,6 +231,160 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     );
   }
 
+  Widget _buildDropdownColor() {  
+    return GestureDetector(
+      onTap: _isSaving ? null : _showColorPicker,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Color',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            if (selectedColor == null)
+              const Text('Selecciona un color',
+                  style: TextStyle(color: Colors.black54))
+            else
+              Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: _getColorFromName(selectedColor!),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade400),
+                    ),
+                    child: null,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(selectedColor!),
+                ],
+              ),
+            const Icon(Icons.arrow_drop_down, color: Colors.black54),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getColorFromName(String name) {
+    switch (name) {
+      case 'Blanco':
+        return Colors.white;
+      case 'Negro':
+        return Colors.black;
+      case 'Gris':
+        return Colors.grey;
+      case 'Plata':
+        return const Color(0xFFC0C0C0);
+      case 'Azul':
+        return Colors.blue;
+      case 'Rojo':
+        return Colors.red;
+      case 'Café':
+        return Colors.brown;
+      case 'Beige':
+        return const Color(0xFFF5F5DC);
+      case 'Verde':
+        return Colors.green;
+      case 'Amarillo':
+        return Colors.yellow;
+      default:
+        return Colors.transparent;
+    }
+  }
+
+  void _showColorPicker() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Elige el color'),
+          content: SingleChildScrollView(
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              alignment: WrapAlignment.center,
+              children: colors.map((color) {
+                final isSelected = selectedColor == color;
+                final colorValue = _getColorFromName(color);
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => selectedColor = color);
+                    Navigator.pop(context);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: colorValue,
+                          shape: BoxShape.circle,
+                          border: isSelected
+                              ? Border.all(color: Colors.blue, width: 3)
+                              : Border.all(color: Colors.grey.shade300),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withValues(alpha: 0.2),
+                              spreadRadius: 1,
+                              blurRadius: 3,
+                            )
+                          ],
+                        ),
+                        child: null,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(color,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            )
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDropdownTransmission() {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: 'Transmisión',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: selectedTransmission,
+          hint: const Text('Tipo'),
+          onChanged: _isSaving
+              ? null
+              : (v) => setState(() => selectedTransmission = v),
+          items: transmissions
+              .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+              .toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPlateInput() {
     return TextField(
       controller: _plateController,
@@ -230,6 +413,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     if (selectedYear == null ||
         selectedBrand == null ||
         selectedModel == null ||
+        selectedColor == null ||
+        selectedTransmission == null ||
         _plateController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor completa todos los campos')),
@@ -272,6 +457,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
         'year': selectedYear,
         'brand': selectedBrand,
         'model': selectedModel,
+        'color': selectedColor,
+        'transmission': selectedTransmission,
         'plate': _plateController.text.trim().toUpperCase(),
         'userId': userId,
       };

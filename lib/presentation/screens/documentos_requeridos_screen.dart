@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/file_upload_service.dart';
+import '../../services/file_upload_service.dart';
 import 'product_car_screen.dart';
 
 class DocumentosRequeridosScreen extends StatefulWidget {

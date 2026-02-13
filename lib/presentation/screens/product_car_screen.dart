@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'cotizar_auto_screen.dart'; // Para navegar a editar
-import '../services/file_upload_service.dart'; // Para borrar archivos
+import '../../services/file_upload_service.dart'; // Para borrar archivos
 
 class ProductCarScreen extends StatelessWidget {
   final String autoId;
@@ -28,7 +28,7 @@ class ProductCarScreen extends StatelessWidget {
         return docs['Fotos del vehículo'] as String?;
       }
     } catch (e) {
-      print('Error obteniendo imagen: $e');
+      debugPrint('Error obteniendo imagen: $e');
     }
     return null;
   }
@@ -142,6 +142,8 @@ class ProductCarScreen extends StatelessWidget {
     final brand = carData['brand'] ?? 'N/A';
     final model = carData['model'] ?? 'N/A';
     final year = carData['year'] ?? 'N/A';
+    final color = carData['color'] ?? 'N/A';
+    final transmission = carData['transmission'] ?? 'N/A';
     final plate = carData['plate'] ?? 'N/A';
 
     return Scaffold(
@@ -156,7 +158,7 @@ class ProductCarScreen extends StatelessWidget {
               color: Color(0xFF1565C0),
               fontWeight: FontWeight.bold,
             ),
-          ),
+          ),  
         ),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
@@ -304,6 +306,10 @@ class ProductCarScreen extends StatelessWidget {
                   _buildInfoRow(Icons.category, 'Modelo', model),
                   const Divider(height: 24),
                   _buildInfoRow(Icons.calendar_today, 'Año', year),
+                  const Divider(height: 24),
+                  _buildInfoRow(Icons.palette, 'Color', color),
+                  const Divider(height: 24),
+                  _buildInfoRow(Icons.settings, 'Transmisión', transmission),
                   const Divider(height: 24),
                   _buildInfoRow(Icons.confirmation_number, 'Placas', plate),
                 ],
