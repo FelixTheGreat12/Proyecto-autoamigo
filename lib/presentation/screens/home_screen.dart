@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:autoamigo/infrastructure/auth/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'rentar_auto_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     // --- LÓGICA DE NAVEGACIÓN ---
     if (isArrendatario) {
-      // ARRENDATARIO: [0: Home, 1: Buscar, 2: Perfil]
+      // ARRENDATARIO: [0: Home, 1: Buscar, 2: Mis Rentas, 3: Perfil]
       switch (index) {
         case 0: // Home
           break;
@@ -49,22 +50,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           // Navigator.pushNamed(context, '/buscar'); // Pendiente
           print("Navegar a Buscar (Arrendatario)");
           break;
-        case 2: // Perfil
-          // Navigator.pushNamed(context, '/perfil'); // Pendiente
-          print("Navegar a Perfil");
+        case 2: // Mis Rentas
+           Navigator.pushNamed(context, '/mis_rentas');
+           break;
+        case 3: // Perfil
+          Navigator.pushNamed(context, '/perfil');
           break;
       }
     } else {
-      // ARRENDADOR: [0: Home, 1: Cotizar, 2: Perfil]
+      // ARRENDADOR: [0: Home, 1: Cotizar, 2: Solicitudes, 3: Perfil]
       switch (index) {
         case 0: // Home
           break;
         case 1: // Cotizar
           Navigator.pushNamed(context, '/cotizar_auto');
           break;
-        case 2: // Perfil
-          // Navigator.pushNamed(context, '/perfil'); // Pendiente
-          print("Navegar a Perfil");
+        case 2: // Solicitudes
+           Navigator.pushNamed(context, '/solicitudes_renta');
+           break;
+        case 3: // Perfil
+          Navigator.pushNamed(context, '/perfil');
           break;
       }
     }
@@ -177,8 +182,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ],
         ),
-        child: BottomNavigationBar(
-          items: isArrendatario
+        child: Theme(
+          data: ThemeData(
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+          ),
+          child: BottomNavigationBar(
+            items: isArrendatario
               ? const [
                   BottomNavigationBarItem(
                     icon: Icon(Icons.home_filled),
@@ -187,6 +197,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   BottomNavigationBarItem(
                     icon: Icon(Icons.search),
                     label: 'Buscar',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.key),
+                    label: 'Mis Rentas',
                   ),
                   BottomNavigationBarItem(
                     icon: Icon(Icons.person_outline),
@@ -201,6 +215,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   BottomNavigationBarItem(
                     icon: Icon(Icons.add_circle_outline),
                     label: 'Cotizar',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.people_alt_outlined),
+                    label: 'Solicitudes',
                   ),
                   BottomNavigationBarItem(
                     icon: Icon(Icons.person_outline),
@@ -218,6 +236,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           type: BottomNavigationBarType.fixed,
           selectedFontSize: 12,
           unselectedFontSize: 12,
+        ),
         ),
       ),
     );
@@ -342,39 +361,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
                       onTap: () {
-                        // Mostrar un diálogo de "Rentar Auto" en lugar de ir a editar
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text('Rentar $brand $model'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('Precio por día: \$$price MXN'),
-                                const SizedBox(height: 10),
-                                const Text(
-                                    '¿Deseas iniciar el proceso de renta para este vehículo?'),
-                              ],
+                        // Navegar a la pantalla de detalles para rentar
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RentarAutoScreen(
+                              autoId: autoId,
+                              carData: data,
+                              price: price, // Pasar el precio calculado
                             ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Cancelar'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  // Aquí iría la lógica de renta futura
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content:
-                                          Text('Solicitud de renta enviada'),
-                                    ),
-                                  );
-                                },
-                                child: const Text('Solicitar Renta'),
-                              ),
-                            ],
                           ),
                         );
                       },
@@ -437,27 +432,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '$brand $model $year',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF263238),
+                                Expanded( // <-- AGREGADO: Evita el overflow
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '$brand $model $year',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF263238),
+                                        ),
+                                        maxLines: 1, // <-- AGREGADO: Limita a una línea
+                                        overflow: TextOverflow.ellipsis, // <-- AGREGADO: Pone '...'
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Disponible ahora',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.green[600],
-                                        fontWeight: FontWeight.w500,
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Disponible ahora',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.green[600],
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,

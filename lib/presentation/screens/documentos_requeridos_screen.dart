@@ -216,7 +216,7 @@ class _DocumentosRequeridosScreenState
                                 const SizedBox(height: 12),
                                 _buildDocField(
                                   'Fotos del vehículo',
-                                  format: 'JPG',
+                                  format: 'JPG/PNG',
                                 ),
                               ],
                             ),

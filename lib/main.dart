@@ -7,8 +7,12 @@ import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/register_screen.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/mis_autos_screen.dart';
+import 'presentation/screens/mis_rentas_screen.dart';
+import 'presentation/screens/solicitudes_renta_screen.dart';
 import 'presentation/screens/cotizar_auto_screen.dart';
 import 'presentation/screens/documentos_requeridos_screen.dart';
+import 'presentation/screens/perfil_screen.dart';
+import 'presentation/screens/subir_documentos_usuario_screen.dart';
 // import 'presentation/screens/product_car_screen.dart';
 import 'infrastructure/auth/auth_service.dart';
 
@@ -44,7 +48,11 @@ class MyApp extends StatelessWidget {
         '/register': (context) => const RegisterScreen(),
         '/home': (context) => HomeScreen(),
         '/mis_autos': (context) => const  MisAutosScreen(),
+        '/mis_rentas': (context) => const MisRentasScreen(),
+        '/solicitudes_renta': (context) => const SolicitudesRentaScreen(),
         '/cotizar_auto': (context) => const CotizarAutoScreen(),
+        '/perfil': (context) => const PerfilScreen(),
+        '/subir_documentos_usuario': (context) => const SubirDocumentosUsuarioScreen(),
         //'/documentos_requeridos': (context) => const DocumentosRequeridosScreen(),
         //'/product_car': (context) => const ProductCarScreen(),
       },
