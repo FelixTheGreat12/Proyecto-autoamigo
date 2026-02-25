@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
-class DetalleSolicitudScreen extends StatelessWidget {
+class DetalleSolicitudScreen extends StatefulWidget {
   final String rentalId;
   final String tenantId;
   final Map<String, dynamic> rentalData;
@@ -14,9 +14,14 @@ class DetalleSolicitudScreen extends StatelessWidget {
     required this.rentalData,
   });
 
+  @override
+  State<DetalleSolicitudScreen> createState() => _DetalleSolicitudScreenState();
+}
+
+class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
   Future<Map<String, dynamic>?> _getTenantData() async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(tenantId).get();
+      final doc = await FirebaseFirestore.instance.collection('users').doc(widget.tenantId).get();
       return doc.data();
     } catch (e) {
       debugPrint('Error getting tenant data: $e');
@@ -31,7 +36,7 @@ class DetalleSolicitudScreen extends StatelessWidget {
     try {
       final doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(tenantId)
+          .doc(widget.tenantId)
           .collection('documentos')
           .doc('documentos_info')
           .get();
@@ -45,7 +50,7 @@ class DetalleSolicitudScreen extends StatelessWidget {
     return null;
   }
 
-  Future<void> _openDocument(BuildContext context, String? url) async {
+  void _openDocument(BuildContext context, String? url, String title) {
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Documento no disponible')),
@@ -53,23 +58,20 @@ class DetalleSolicitudScreen extends StatelessWidget {
       return;
     }
 
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir el documento')),
-        );
-      }
-    }
+    // Navegar a la pantalla de visualización interna
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PDFViewerScreen(url: url, title: title),
+      ),
+    );
   }
 
   Future<void> _updateStatus(BuildContext context, String newStatus) async {
     try {
       await FirebaseFirestore.instance
           .collection('rentals')
-          .doc(rentalId)
+          .doc(widget.rentalId)
           .update({'status': newStatus});
 
       if (context.mounted) {
@@ -92,12 +94,19 @@ class DetalleSolicitudScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = rentalData['status'] ?? 'pending';
-    final carBrand = rentalData['carBrand'] ?? '';
-    final carModel = rentalData['carModel'] ?? '';
-    final carYear = rentalData['carYear'] ?? '';
-    final price = rentalData['pricePerDay'] ?? 0;
-    final timestamp = rentalData['createdAt'] as Timestamp?;
+    final status = widget.rentalData['status'] ?? 'pending';
+    final carBrand = widget.rentalData['carBrand'] ?? '';
+    final carModel = widget.rentalData['carModel'] ?? '';
+    final carYear = widget.rentalData['carYear'] ?? '';
+    final price = widget.rentalData['pricePerDay'] ?? 0;
+    
+    // Safety check for timestamp
+    final rawDate = widget.rentalData['createdAt'];
+    Timestamp? timestamp;
+    if (rawDate is Timestamp) {
+      timestamp = rawDate;
+    }
+
     final dateStr = timestamp != null
         ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
         : "N/A";
@@ -282,16 +291,11 @@ class DetalleSolicitudScreen extends StatelessWidget {
   }
 
   Widget _buildDocCard(BuildContext context, String label, IconData icon, String? url) {
-    if (url == null) {
-      // Si la URL es nula, intentamos obtenerla del mapa de documentos
-      // pero aquí ya debería venir resuelta. 
-      // Si sigue siendo nula, mostramos el estado vacio.
-    }
-    
+
     final bool hasDoc = url != null && url.isNotEmpty;
 
     return InkWell(
-      onTap: () => hasDoc ? _openDocument(context, url) : null,
+      onTap: () => hasDoc ? _openDocument(context, url, label) : null,
       child: Container(
         height: 100,
         decoration: BoxDecoration(
@@ -320,17 +324,11 @@ class DetalleSolicitudScreen extends StatelessWidget {
                 ),
               ],
             ),
-            if (!hasDoc)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Icon(Icons.close, size: 16, color: Colors.grey[400]),
-              ),
             if (hasDoc)
               Positioned(
                 top: 8,
                 right: 8,
-                child: Icon(Icons.open_in_new, size: 16, color: Colors.blue[300]),
+                child: Icon(Icons.visibility, size: 16, color: Colors.blue[300]), // Icono de ojo (ver)
               ),
           ],
         ),
@@ -453,5 +451,41 @@ class DetalleSolicitudScreen extends StatelessWidget {
       case 'pending': return Colors.orange;
       default: return Colors.grey;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PANTALLA DE VISOR DE PDF INTERNO (Sin opción obvia de descarga)
+// ---------------------------------------------------------------------------
+class PDFViewerScreen extends StatelessWidget {
+  final String url;
+  final String title;
+
+  const PDFViewerScreen({super.key, required this.url, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    // Detectar si es una imagen simple por la extensión (opcional, para robustez)
+    final isImage = url.toLowerCase().contains('.jpg') || 
+                    url.toLowerCase().contains('.jpeg') || 
+                    url.toLowerCase().contains('.png');
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1565C0),
+        // No agregamos actions aquí, por lo que no hay botón "Share" ni "Download" en la AppBar
+      ),
+      body: isImage
+          ? Center(child: Image.network(url)) // Si es imagen, la muestra
+          : SfPdfViewer.network(
+              url,
+              // Deshabilitamos interacciones que puedan facilitar la extracción
+              enableTextSelection: false, 
+              canShowScrollHead: false,
+              pageLayoutMode: PdfPageLayoutMode.continuous,
+            ),
+    );
   }
 }

@@ -224,7 +224,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     // 5. Navega a la pantalla de inicio si todo salió bien
     if (result != null) {
       if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      
+      Navigator.pushNamedAndRemoveUntil(
+        context, 
+        '/home', 
+        (route) => false
+      );
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -831,6 +836,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           const Text('Municipio', style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 5),
                           DropdownButtonFormField<String>(
+
                             isExpanded: true,
                             decoration: InputDecoration(
                               hintText: 'Selecciona Municipio',

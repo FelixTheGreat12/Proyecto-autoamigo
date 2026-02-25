@@ -2,7 +2,9 @@ import 'dart:math';
 import 'package:autoamigo/infrastructure/auth/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'buscar_auto_screen.dart';
 import 'rentar_auto_screen.dart';
+import 'subir_documentos_usuario_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,37 +44,124 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     // --- LÓGICA DE NAVEGACIÓN ---
     if (isArrendatario) {
-      // ARRENDATARIO: [0: Home, 1: Buscar, 2: Mis Rentas, 3: Perfil]
+      // ARRENDATARIO: [0: Buscar, 1: Mis Rentas]
       switch (index) {
-        case 0: // Home
+        case 0: // Buscar
+           Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const BuscarAutoScreen()),
+          );
           break;
-        case 1: // Buscar
-          // Navigator.pushNamed(context, '/buscar'); // Pendiente
-          print("Navegar a Buscar (Arrendatario)");
-          break;
-        case 2: // Mis Rentas
+        case 1: // Mis Rentas
            Navigator.pushNamed(context, '/mis_rentas');
            break;
-        case 3: // Perfil
-          Navigator.pushNamed(context, '/perfil');
-          break;
       }
     } else {
-      // ARRENDADOR: [0: Home, 1: Cotizar, 2: Solicitudes, 3: Perfil]
+      // ARRENDADOR: [0: Cotizar, 1: Solicitudes]
       switch (index) {
-        case 0: // Home
-          break;
-        case 1: // Cotizar
+        case 0: // Cotizar
           Navigator.pushNamed(context, '/cotizar_auto');
           break;
-        case 2: // Solicitudes
+        case 1: // Solicitudes
            Navigator.pushNamed(context, '/solicitudes_renta');
            break;
-        case 3: // Perfil
-          Navigator.pushNamed(context, '/perfil');
-          break;
       }
     }
+  }
+
+  Stream<bool> _checkDocumentsMissing(String uid) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('documentos')
+        .doc('documentos_info')
+        .snapshots()
+        .map((snapshot) {
+      if (!snapshot.exists) return true;
+      final data = snapshot.data();
+      if (data == null || !data.containsKey('documents')) return true;
+
+      final docs = data['documents'] as Map<String, dynamic>;
+      final hasIne = docs['INE / IFE'] != null && docs['INE / IFE'].toString().isNotEmpty;
+      final hasLicencia = docs['Licencia'] != null && docs['Licencia'].toString().isNotEmpty;
+      final hasComprobante = docs['Comprobante'] != null && docs['Comprobante'].toString().isNotEmpty;
+
+      return !(hasIne && hasLicencia && hasComprobante);
+    });
+  }
+
+  Widget _buildMissingDocumentsBanner() {
+    final user = _authService.currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    return StreamBuilder<bool>(
+      stream: _checkDocumentsMissing(user.uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.hasError) return const SizedBox.shrink();
+        
+        // Si data es false, significa que NO faltan documentos (todo ok).
+        // Si data es true, significa que SÍ faltan documentos.
+        final areDocumentsMissing = snapshot.data!;
+        
+        if (!areDocumentsMissing) return const SizedBox.shrink();
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Card(
+            color: Colors.yellow[100],
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.yellow[700]!, width: 1),
+            ),
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                children: [
+                   Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange[800], size: 30),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '¡Acción Requerida!\nFaltan subir tus documentos (INE, Licencia, Comprobante).',
+                          style: TextStyle(
+                            color: Colors.orange[900],
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                         Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SubirDocumentosUsuarioScreen(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange[800],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                      child: const Text('Subir Documentos Ahora'),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -98,17 +187,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: IconButton(
-              onPressed: () async {
-                await _authService.signOut();
-                if (!mounted) return;
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/login',
-                  (route) => false,
-                );
+              onPressed: () {
+                Navigator.pushNamed(context, '/perfil');
               },
-              icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-              tooltip: 'Cerrar sesión',
+              icon: const Icon(Icons.person, color: Color(0xFF1565C0)),
+              tooltip: 'Perfil',
             ),
           ),
         ],
@@ -191,10 +274,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             items: isArrendatario
               ? const [
                   BottomNavigationBarItem(
-                    icon: Icon(Icons.home_filled),
-                    label: 'Inicio',
-                  ),
-                  BottomNavigationBarItem(
                     icon: Icon(Icons.search),
                     label: 'Buscar',
                   ),
@@ -202,16 +281,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     icon: Icon(Icons.key),
                     label: 'Mis Rentas',
                   ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.person_outline),
-                    label: 'Perfil',
-                  ),
                 ]
               : const [
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.home_filled),
-                    label: 'Inicio',
-                  ),
                   BottomNavigationBarItem(
                     icon: Icon(Icons.add_circle_outline),
                     label: 'Cotizar',
@@ -219,10 +290,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   BottomNavigationBarItem(
                     icon: Icon(Icons.people_alt_outlined),
                     label: 'Solicitudes',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.person_outline),
-                    label: 'Perfil',
                   ),
                 ],
           currentIndex: _selectedIndex,
@@ -246,6 +313,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Banner de aviso de documentos faltantes
+        _buildMissingDocumentsBanner(),
+
         // Banner de bienvenida ARRENDATARIO
         Container(
           width: double.infinity,
@@ -502,6 +572,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Banner de aviso de documentos faltantes
+        _buildMissingDocumentsBanner(),
+        
         // Banner de bienvenida específico por rol
         Container(
           width: double.infinity,

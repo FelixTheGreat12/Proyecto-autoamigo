@@ -266,54 +266,7 @@ class MisAutosScreen extends StatelessWidget {
           );
         },
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_filled),
-              label: 'Inicio',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.add_circle_outline),
-              label: 'Cotizar',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.map_outlined),
-              label: 'Localizar',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              label: 'Perfil',
-            ),
-          ],
-          currentIndex:
-              1, // Resaltamos "Cotizar" o similar, ya que estamos en gestión
-          backgroundColor: Colors.white,
-          elevation: 0,
-          selectedItemColor: Colors.grey[800],
-          unselectedItemColor: Colors.grey[600],
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          onTap: (index) {
-            if (index == 0) {
-              Navigator.popUntil(context, ModalRoute.withName('/'));
-            }
-            // Otros casos...
-          },
-        ),
-      ),
+
     );
   }
 }
