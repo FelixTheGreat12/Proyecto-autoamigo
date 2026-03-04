@@ -6,6 +6,8 @@ import 'buscar_auto_screen.dart';
 import 'rentar_auto_screen.dart';
 import 'subir_documentos_usuario_screen.dart';
 
+import '../widgets/car_image_loader.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -450,49 +452,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           SizedBox(
                             height: 180,
                             width: double.infinity,
-                            child: FutureBuilder<DocumentSnapshot>(
-                              future: FirebaseFirestore.instance
-                                  .collection('autos')
-                                  .doc(autoId)
-                                  .collection('documentos')
-                                  .doc('documentos_info')
-                                  .get(),
-                              builder: (context, imageSnapshot) {
-                                if (!imageSnapshot.hasData) {
-                                  return Container(
-                                    color: Colors.grey[200],
-                                    child: const Center(
-                                        child: CircularProgressIndicator()),
-                                  );
-                                }
-                                
-                                final docData = imageSnapshot.data!.data();
-                                String? imageUrl;
-                                if (docData != null && docData is Map) {
-                                  final docsMap = docData['documents'] as Map?;
-                                  if (docsMap != null) {
-                                    imageUrl = docsMap['Fotos del vehículo'];
-                                  }
-                                }
-
-                                if (imageUrl == null) {
-                                  return Container(
-                                    color: Colors.grey[200],
-                                    child: Icon(Icons.directions_car,
-                                        size: 64, color: Colors.grey[400]),
-                                  );
-                                }
-
-                                return Image.network(
-                                  imageUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (c, e, s) => Container(
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.broken_image,
-                                        color: Colors.grey),
-                                  ),
-                                );
-                              },
+                            child: CarImageLoader(
+                              autoId: autoId,
+                              fit: BoxFit.cover,
                             ),
                           ),
                           

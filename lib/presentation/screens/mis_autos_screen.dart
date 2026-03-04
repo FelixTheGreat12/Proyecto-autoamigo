@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 // Asegúrate de importar tu pantalla de producto
 import 'product_car_screen.dart';
+import '../widgets/car_image_loader.dart';
 
 class MisAutosScreen extends StatelessWidget {
   const MisAutosScreen({super.key});
@@ -168,21 +169,14 @@ class MisAutosScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(16.0),
                       child: Row(
                         children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: iconColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
-                              child: Text(
-                                brand.isNotEmpty ? brand[0].toUpperCase() : 'A',
-                                style: TextStyle(
-                                  color: iconColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 20,
-                                ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: SizedBox(
+                              width: 50,
+                              height: 50,
+                              child: CarImageLoader(
+                                autoId: autoId,
+                                fit: BoxFit.cover,
                               ),
                             ),
                           ),
