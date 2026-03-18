@@ -109,7 +109,7 @@ class MisRentasScreen extends StatelessWidget {
 
               return GestureDetector(
                 onTap: () {
-                  if (status == 'approved') {
+                  if (status == 'approved' || status == 'in_progress') {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -202,6 +202,12 @@ class MisRentasScreen extends StatelessWidget {
     IconData icon;
 
     switch (status) {
+      case 'in_progress':
+        bgColor = Colors.blue[100]!;
+        textColor = Colors.blue[800]!;
+        text = 'En uso';
+        icon = Icons.directions_car;
+        break;
       case 'approved':
         bgColor = Colors.green[100]!;
         textColor = Colors.green[800]!;

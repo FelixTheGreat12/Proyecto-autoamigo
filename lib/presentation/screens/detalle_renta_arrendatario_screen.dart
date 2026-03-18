@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'ubicacion_auto_screen.dart';
+import 'pdf_viewer_screen.dart';
 
 class DetalleRentaArrendatarioScreen extends StatelessWidget {
   final String rentalId;
@@ -140,10 +142,229 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+
+                const SizedBox(height: 24),
+
+                // 2. ESTADO DE LA RENTA
+                if (status == 'approved') ...[
+                  // ADVERTENCIA DE PERMISO PRESENCIAL
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0), // Naranja suave
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: Colors.orange[800], size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Importante: Validación Presencial',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange[900],
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'El día acordado debes presentarte con el propietario para que verifique tu licencia y valide tu permiso en la app para poder conducir.',
+                                style: TextStyle(color: Colors.orange[900], fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (status == 'in_progress') ...[
+                  // ESTADO: EN USO
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE3F2FD), // Azul suave
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.directions_car, color: Colors.blue[800], size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Vehículo En Uso',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[900],
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Disfruta tu viaje. Recuerda devolver el auto a tiempo y en buen estado.',
+                                style: TextStyle(color: Colors.blue[900], fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (status == 'rejected') ...[
+                   // ESTADO: RECHAZADA
+                   Container(
+                     padding: const EdgeInsets.all(16),
+                     decoration: BoxDecoration(
+                       color: const Color(0xFFFFEBEE), // Rojo suave
+                       borderRadius: BorderRadius.circular(12),
+                       border: Border.all(color: Colors.red.shade300),
+                     ),
+                     child: Row(
+                       children: [
+                         Icon(Icons.cancel, color: Colors.red[800], size: 28),
+                         const SizedBox(width: 12),
+                         Expanded(
+                           child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Text(
+                                 'Solicitud Rechazada',
+                                 style: TextStyle(
+                                   fontWeight: FontWeight.bold,
+                                   color: Colors.red[900],
+                                   fontSize: 15,
+                                 ),
+                               ),
+                               const SizedBox(height: 4),
+                               Text(
+                                 'Lo sentimos, el propietario ha rechazado tu solicitud.',
+                                 style: TextStyle(color: Colors.red[900], fontSize: 13),
+                               ),
+                             ],
+                           ),
+                         ),
+                       ],
+                     ),
+                   ),
+                ] else if(status == 'pending') ...[
+                   // ESTADO: PENDIENTE
+                   Container(
+                     padding: const EdgeInsets.all(16),
+                     decoration: BoxDecoration(
+                       color: const Color(0xFFFAFAFA), // Gris suave
+                       borderRadius: BorderRadius.circular(12),
+                       border: Border.all(color: Colors.grey.shade300),
+                     ),
+                     child: Row(
+                       children: [
+                         Icon(Icons.hourglass_empty, color: Colors.grey[800], size: 28),
+                         const SizedBox(width: 12),
+                         Expanded(
+                           child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Text(
+                                 'Solicitud Pendiente',
+                                 style: TextStyle(
+                                   fontWeight: FontWeight.bold,
+                                   color: Colors.grey[900],
+                                   fontSize: 15,
+                                 ),
+                               ),
+                               const SizedBox(height: 4),
+                               Text(
+                                 'Esperando respuesta del propietario.',
+                                 style: TextStyle(color: Colors.grey[900], fontSize: 13),
+                               ),
+                             ],
+                           ),
+                         ),
+                       ],
+                     ),
+                   ),
+                ],
                 
                 const SizedBox(height: 24),
 
-                // 2. INFO DEL AUTO Y RENTA
+                // 3. UBICACIÓN DE ENTREGA
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12, left: 4),
+                  child: const Text(
+                    'Ubicación de Entrega',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF455A64),
+                    ),
+                  ),
+                ),
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.location_on, color: Colors.blue[800]),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                address,
+                                style: const TextStyle(fontSize: 15, color: Color(0xFF263238)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (address != 'No registrada') ...[
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => UbicacionAutoScreen(address: address),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.map),
+                              label: const Text('Ver Ubicación en el Mapa'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF1565C0),
+                                side: const BorderSide(color: Color(0xFF1565C0)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // 4. INFO DEL AUTO Y RENTA
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12, left: 4),
                   child: const Text(
@@ -185,36 +406,12 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                         const Divider(height: 32),
                         _buildDetailRow('Precio acordado', '\$$price MXN / día'),
                         _buildDetailRow('Fecha solicitud', dateStr),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.green[50], // Light green bg because it's approved
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green[100]!),
-                          ),
-                          child: const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Estado: Aprobado',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Ponte en contacto con el propietario para acordar la entrega.',
-                                style: TextStyle(fontSize: 13, color: Colors.black87),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
                 ),
 
-                if (status == 'approved' && rentalData['autoId'] != null) ...[
+                if ((status == 'approved' || status == 'in_progress') && rentalData['autoId'] != null) ...[
                   const SizedBox(height: 24),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12, left: 4),
@@ -260,28 +457,29 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                          );
                       }
 
-                      return Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        child: Column(
-                          children: docs.entries.map((entry) {
-                            final key = entry.key;
-                            final url = entry.value.toString();
-
-                            IconData icon = Icons.description;
-                            if (key.contains('Seguro')) icon = Icons.security;
-                            if (key.contains('Circulación')) icon = Icons.credit_card;
-                            if (key.contains('Verificación')) icon = Icons.verified;
-                            if (key.contains('Foto')) icon = Icons.image;
-
-                            return ListTile(
-                              leading: Icon(icon, color: const Color(0xFF1565C0)),
-                              title: Text(key, style: const TextStyle(fontWeight: FontWeight.w500)),
-                              trailing: const Icon(Icons.open_in_new, color: Colors.grey),
-                              onTap: () => _launchUrl(context, url),
-                            );
-                          }).toList(),
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 1.3,
                         ),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final entry = docs.entries.elementAt(index);
+                          final key = entry.key;
+                          final url = entry.value.toString();
+
+                          IconData icon = Icons.description;
+                          if (key.contains('Seguro')) icon = Icons.security;
+                          if (key.contains('Circulación')) icon = Icons.credit_card;
+                          if (key.contains('Verificación')) icon = Icons.verified;
+                          if (key.contains('Foto')) icon = Icons.image;
+
+                          return _buildDocCard(context, key, icon, url);
+                        },
                       );
                     },
                   ),
@@ -337,6 +535,71 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
     );
   }
 
+  void _openDocument(BuildContext context, String? url, String title) {
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Documento no disponible')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PDFViewerScreen(url: url, title: title),
+      ),
+    );
+  }
+
+  Widget _buildDocCard(BuildContext context, String label, IconData icon, String? url) {
+    final bool hasDoc = url != null && url.isNotEmpty;
+
+    return InkWell(
+      onTap: () => hasDoc ? _openDocument(context, url, label) : null,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: hasDoc ? Colors.blue[300]! : Colors.grey[300]!),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 32,
+                  color: hasDoc ? const Color(0xFF1565C0) : Colors.grey[400],
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: hasDoc ? const Color(0xFF1565C0) : Colors.grey[500],
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (hasDoc)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Icon(Icons.visibility, size: 16, color: Colors.blue[300]),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInfoRow(IconData icon, String text, {int maxLines = 1}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,3 +637,4 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
     );
   }
 }
+

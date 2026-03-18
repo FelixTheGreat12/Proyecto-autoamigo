@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
+import 'pdf_viewer_screen.dart';
+
 class DetalleSolicitudScreen extends StatefulWidget {
   final String rentalId;
   final String tenantId;
@@ -75,10 +77,31 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           .update({'status': newStatus});
 
       if (context.mounted) {
+        String message;
+        Color color;
+        
+        switch (newStatus) {
+          case 'approved':
+            message = 'Solicitud aceptada. Esperando entrega.';
+            color = Colors.green;
+            break;
+          case 'rejected':
+            message = 'Solicitud rechazada';
+            color = Colors.red;
+            break;
+          case 'in_progress':
+            message = '¡Renta iniciada! Vehículo en uso.';
+            color = Colors.blue;
+            break;
+          default:
+            message = 'Estado actualizado';
+            color = Colors.grey;
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(newStatus == 'approved' ? 'Solicitud aceptada' : 'Solicitud rechazada'),
-            backgroundColor: newStatus == 'approved' ? Colors.green : Colors.red,
+            content: Text(message),
+            backgroundColor: color,
           ),
         );
         Navigator.pop(context); // Regresar a la lista
@@ -92,9 +115,39 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
     }
   }
 
+  Future<void> _confirmDeliveryAndStartRental(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar Entrega y Permiso'),
+        content: const Text(
+          'Al continuar, confirmas que:\n\n'
+          '✅ Has verificado físicamente la licencia del arrendatario.\n'
+          '✅ Has entregado el vehículo.\n'
+          '✅ Otorgas permiso explícito para manejar.\n\n'
+          'La renta pasará a estado "En Uso".',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0)),
+            child: const Text('Confirmar e Iniciar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && context.mounted) {
+      _updateStatus(context, 'in_progress');
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final status = widget.rentalData['status'] ?? 'pending';
+
     final carBrand = widget.rentalData['carBrand'] ?? '';
     final carModel = widget.rentalData['carModel'] ?? '';
     final carYear = widget.rentalData['carYear'] ?? '';
@@ -224,6 +277,7 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                 // 3. DOCUMENTACIÓN DEL USUARIO (FETCHING)
                 _buildSectionTitle('Documentación del Usuario'),
                 FutureBuilder<Map<String, dynamic>?>(
+
                   future: _getTenantDocuments(),
                   builder: (context, docSnapshot) {
                     if (docSnapshot.connectionState == ConnectionState.waiting) {
@@ -286,7 +340,9 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           );
         },
       ),
-      bottomNavigationBar: status == 'pending' ? _buildActionButtons(context) : null,
+      bottomNavigationBar: (status == 'pending' || status == 'approved')
+          ? _buildActionButtons(context, status)
+          : null,
     );
   }
 
@@ -336,7 +392,46 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(BuildContext context, String status) {
+    if (status == 'approved') {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea( // Asegurar padding en dispositivos con notch
+          child: SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: () => _confirmDeliveryAndStartRental(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1565C0),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.vpn_key_outlined, color: Colors.white),
+              label: const Text(
+                'Confirmar Entrega y Permiso',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Default: Pending status -> Approve/Reject
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -440,6 +535,8 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
       case 'approved': return 'Aprobada';
       case 'rejected': return 'Rechazada';
       case 'pending': return 'Pendiente';
+      case 'in_progress': return 'En uso';
+      case 'completed': return 'Finalizada';
       default: return status;
     }
   }
@@ -449,43 +546,9 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
       case 'approved': return Colors.green;
       case 'rejected': return Colors.red;
       case 'pending': return Colors.orange;
+      case 'in_progress': return Colors.blue;
       default: return Colors.grey;
     }
   }
 }
 
-// ---------------------------------------------------------------------------
-// PANTALLA DE VISOR DE PDF INTERNO (Sin opción obvia de descarga)
-// ---------------------------------------------------------------------------
-class PDFViewerScreen extends StatelessWidget {
-  final String url;
-  final String title;
-
-  const PDFViewerScreen({super.key, required this.url, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    // Detectar si es una imagen simple por la extensión (opcional, para robustez)
-    final isImage = url.toLowerCase().contains('.jpg') || 
-                    url.toLowerCase().contains('.jpeg') || 
-                    url.toLowerCase().contains('.png');
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1565C0),
-        // No agregamos actions aquí, por lo que no hay botón "Share" ni "Download" en la AppBar
-      ),
-      body: isImage
-          ? Center(child: Image.network(url)) // Si es imagen, la muestra
-          : SfPdfViewer.network(
-              url,
-              // Deshabilitamos interacciones que puedan facilitar la extracción
-              enableTextSelection: false, 
-              canShowScrollHead: false,
-              pageLayoutMode: PdfPageLayoutMode.continuous,
-            ),
-    );
-  }
-}

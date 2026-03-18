@@ -3,6 +3,10 @@
         android:label="autoamigo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        
+        <!-- Fija los problemas de Google Maps en versiones recientes de Android -->
+        <uses-library android:name="org.apache.http.legacy" android:required="false" />
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -30,6 +34,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+            
+        <!-- Clave API de Google Maps -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyDph17cP33oGsghRpRWDLlWrA4X-kBf1Lg" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

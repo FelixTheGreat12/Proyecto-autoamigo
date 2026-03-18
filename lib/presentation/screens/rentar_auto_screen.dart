@@ -15,25 +15,6 @@ class RentarAutoScreen extends StatelessWidget {
     required this.price,
   });
 
-  // Obtiene la URL de la foto del auto desde Firestore
-  Future<String?> _getCarImageUrl() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('autos')
-          .doc(autoId)
-          .collection('documentos')
-          .doc('documentos_info')
-          .get();
-
-      if (doc.exists && doc.data() != null) {
-        final docs = doc.data()!['documents'] as Map<String, dynamic>;
-        return docs['Fotos del vehículo'] as String?;
-      }
-    } catch (e) {
-      debugPrint('Error obteniendo imagen: $e');
-    }
-    return null;
-  }
 
   // Obtiene datos del dueño
   Future<Map<String, dynamic>?> _getOwnerData() async {
@@ -75,7 +56,7 @@ class RentarAutoScreen extends StatelessWidget {
         'autoId': autoId,
         'tenantId': user.uid,
         'ownerId': carData['userId'],
-        'status': 'pending', // pending, approved, rejected
+        'status': 'pending', // pending, approved, rejected, completed
         'createdAt': FieldValue.serverTimestamp(),
         'pricePerDay': price,
         'carBrand': carData['brand'],
@@ -89,9 +70,9 @@ class RentarAutoScreen extends StatelessWidget {
         
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Solicitud enviada. Espera la confirmación del dueño.'),
+            content: Text('Solicitud de renta enviada con éxito'),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
+            duration: Duration(seconds: 5),
           ),
         );
         
@@ -186,7 +167,7 @@ class RentarAutoScreen extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Row(
@@ -217,7 +198,7 @@ class RentarAutoScreen extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.6),
+                    Colors.black.withValues(alpha: 0.6),
                     Colors.transparent,
                   ],
                 ),
@@ -230,7 +211,7 @@ class RentarAutoScreen extends StatelessWidget {
             top: 40,
             left: 16,
             child: CircleAvatar(
-              backgroundColor: Colors.black.withOpacity(0.3),
+              backgroundColor: Colors.black.withValues(alpha: 0.3),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
@@ -350,7 +331,7 @@ class RentarAutoScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.grey.withOpacity(0.05),
+                                color: Colors.grey.withValues(alpha: 0.05),
                                 blurRadius: 15,
                                 offset: const Offset(0, 5),
                               ),
@@ -453,6 +434,30 @@ class RentarAutoScreen extends StatelessWidget {
                         _buildFeatureCard(Icons.local_gas_station_outlined, 'Combustible', 'Gasolina'),
                       ],
                     ),
+
+                    const SizedBox(height: 32),
+                    
+                    // DESCRIPCIÓN 
+                    const Text(
+                      'Descripción del Propietario',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF263238),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Este auto se encuentra en excelentes condiciones mecánicas y estéticas. Ideal para viajes largos o uso diario en la ciudad. Cuenta con seguro vigente y todos los servicios al día.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                        height: 1.5,
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+                    
                   ],
                 ),
               ),
@@ -474,7 +479,7 @@ class RentarAutoScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 5,
-                  shadowColor: const Color(0xFF1565C0).withOpacity(0.4),
+                  shadowColor: const Color(0xFF1565C0).withValues(alpha: 0.4),
                 ),
                 child: const Text(
                   'Solicitar Renta ahora',
@@ -524,7 +529,7 @@ class RentarAutoScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
+            color: Colors.grey.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
