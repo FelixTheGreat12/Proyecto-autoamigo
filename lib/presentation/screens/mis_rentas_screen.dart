@@ -109,28 +109,16 @@ class MisRentasScreen extends StatelessWidget {
 
               return GestureDetector(
                 onTap: () {
-                  if (status == 'approved' || status == 'in_progress') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DetalleRentaArrendatarioScreen(
-                          rentalId: rentalId,
-                          ownerId: ownerId,
-                          rentalData: rental,
-                        ),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DetalleRentaArrendatarioScreen(
+                        rentalId: rentalId,
+                        ownerId: ownerId,
+                        rentalData: rental,
                       ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(status == 'rejected' 
-                          ? 'Esta solicitud fue rechazada.' 
-                          : 'Espera a que el dueño apruebe la solicitud.'),
-                        backgroundColor: status == 'rejected' ? Colors.red : Colors.orange,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  }
+                    ),
+                  );
                 },
                 child: Card(
                   elevation: 2,
@@ -219,6 +207,12 @@ class MisRentasScreen extends StatelessWidget {
         textColor = Colors.red[800]!;
         text = 'Rechazado';
         icon = Icons.cancel_outlined;
+        break;
+      case 'completed':
+        bgColor = Colors.purple[100]!;
+        textColor = Colors.purple[800]!;
+        text = 'Finalizado';
+        icon = Icons.check_circle;
         break;
       case 'pending':
       default:

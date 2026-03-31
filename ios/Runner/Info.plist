@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- Permisos para usar Geolocator (Rastreo GPS) -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Esta aplicación requiere acceso a tu ubicación cuando está en uso para poder compartirla en tiempo real con el propietario del vehículo.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Esta aplicación requiere acceso intermitente a tu ubicación para poder actualizar en tiempo real el progreso de tu renta del vehículo.</string>
 </dict>
 </plist>

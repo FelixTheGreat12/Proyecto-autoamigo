@@ -17,6 +17,7 @@ class CotizarAutoScreen extends StatefulWidget {
 
 class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
   final TextEditingController _plateController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
   bool _isSaving = false;
 
   String? selectedYear;
@@ -64,12 +65,16 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
       selectedColor = widget.existingData!['color'];
       selectedTransmission = widget.existingData!['transmission'];
       _plateController.text = widget.existingData!['plate'] ?? '';
+      if (widget.existingData!['pricePerDay'] != null) {
+        _priceController.text = widget.existingData!['pricePerDay'].toString();
+      }
     }
   }
 
   @override
   void dispose() {
     _plateController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -121,6 +126,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                       _buildDropdownTransmission(),
                       const SizedBox(height: 12),
                       _buildPlateInput(),
+                      const SizedBox(height: 12),
+                      _buildPriceInput(),
                       const SizedBox(height: 16),
                       _buildCotizarButton(isEditing),
                     ],
@@ -147,6 +154,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                         Expanded(child: _buildDropdownTransmission()),
                         const SizedBox(width: 12),
                         Expanded(child: _buildPlateInput()),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildPriceInput()),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -407,6 +416,109 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     );
   }
 
+  Widget _buildPriceInput() {
+    final double suggestedPrice = _getSuggestedPrice();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _priceController,
+          enabled: !_isSaving,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+          ],
+          decoration: InputDecoration(
+            labelText: 'Precio por día',
+            hintText: 'Ej. 500',
+            prefixIcon: const Icon(Icons.attach_money),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
+            ),
+          ),
+        ),
+        if (suggestedPrice > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 6.0, left: 4.0),
+            child: Row(
+              children: [
+                Icon(Icons.lightbulb_outline, size: 14, color: Colors.amber[700]),
+                const SizedBox(width: 4),
+                Text(
+                  'Sugerido: \$${suggestedPrice.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _priceController.text = suggestedPrice.toStringAsFixed(0);
+                    });
+                  },
+                  child: const Text(
+                    'Aplicar',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  double _getSuggestedPrice() {
+    if (selectedYear == null || selectedBrand == null || selectedModel == null || selectedTransmission == null) return 0.0;
+    
+    // Precio base realista asumiendo desgaste, seguro y mercado de renta (p/ej en México)
+    double basePrice = 700.0; 
+    
+    // 1. Extra por el año del coche (mientras más nuevo, más caro)
+    int year = int.tryParse(selectedYear!) ?? 2015;
+    if (year >= 2024) {
+      basePrice += 600;
+    } else if (year >= 2021) {
+      basePrice += 400;
+    } else if (year >= 2018) {
+      basePrice += 200;
+    } else if (year >= 2016) {
+      basePrice += 100;
+    }
+    
+    // 2. Extra por la categoría/segmento del vehículo
+    // Sedanes medianos (Alta demanda y buen espacio)
+    if (['Jetta', 'Sentra', 'Civic', 'Corolla', 'Focus'].contains(selectedModel)) {
+      basePrice += 350;
+    } 
+    // Compactos (Buen rendimiento, espacio aceptable)
+    else if (['Versa', 'Vento', 'Rio', 'K3', 'Aveo', 'Accent', 'i20', 'Fiesta', 'Yaris', 'City'].contains(selectedModel)) {
+      basePrice += 150;
+    }
+    // Vehículos familiares/amplios
+    else if (['Avanza'].contains(selectedModel)) {
+      basePrice += 450;
+    }
+    // Subcompactos (Spark, Beat, March, Gol, etc.) se mantienen en la base + 0
+    
+    // 3. Extra por tipo de transmisión (Las automáticas suelen ser más demandadas y caras)
+    if (['Automática', 'CVT', 'DSG', 'Tiptronic'].contains(selectedTransmission)) {
+      basePrice += 120;
+    }
+    
+    return basePrice;
+  }
+
   Future<void> _saveOrUpdateAuto() async {
     if (_isSaving) return;
 
@@ -415,7 +527,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
         selectedModel == null ||
         selectedColor == null ||
         selectedTransmission == null ||
-        _plateController.text.trim().isEmpty) {
+        _plateController.text.trim().isEmpty ||
+        _priceController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor completa todos los campos')),
       );
@@ -431,6 +544,17 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('La placa debe estar completa: ABC-12-34'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final double? pricePerDay = double.tryParse(_priceController.text.trim());
+    if (pricePerDay == null || pricePerDay <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor ingresa un precio válido mayor a 0'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -460,6 +584,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
         'color': selectedColor,
         'transmission': selectedTransmission,
         'plate': _plateController.text.trim().toUpperCase(),
+        'pricePerDay': pricePerDay,
         'userId': userId,
       };
 

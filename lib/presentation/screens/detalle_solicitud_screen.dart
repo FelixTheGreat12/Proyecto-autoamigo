@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import 'pdf_viewer_screen.dart';
+import 'rastreo_auto_propietario_screen.dart';
 
 class DetalleSolicitudScreen extends StatefulWidget {
   final String rentalId;
@@ -93,6 +94,10 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
             message = '¡Renta iniciada! Vehículo en uso.';
             color = Colors.blue;
             break;
+          case 'completed':
+            message = 'Viaje finalizado correctamente. GPS detenido.';
+            color = Colors.purple;
+            break;
           default:
             message = 'Estado actualizado';
             color = Colors.grey;
@@ -104,7 +109,12 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
             backgroundColor: color,
           ),
         );
-        Navigator.pop(context); // Regresar a la lista
+        
+        // Return to the list ONLY if rejected or completed to clean up the flow,
+        // otherwise they stay here to see the next available actions.
+        if (newStatus == 'rejected' || newStatus == 'completed') {
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
       if (context.mounted) {
@@ -142,38 +152,73 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
       _updateStatus(context, 'in_progress');
     }
   }
+  Future<void> _confirmEndRental(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Finalizar Viaje y Detener GPS'),
+        content: const Text(
+          '¿Estás seguro de que deseas finalizar este viaje?\n\n'
+          '✅ Esto detendrá automáticamente la transmisión GPS del arrendatario.\n'
+          '✅ El viaje pasará a estado "Finalizada".',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Sí, Finalizar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
 
+    if (confirm == true && context.mounted) {
+      _updateStatus(context, 'completed');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final status = widget.rentalData['status'] ?? 'pending';
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('rentals').doc(widget.rentalId).snapshots(),
+      builder: (context, rentalSnapshot) {
+        if (rentalSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFF5F7FA),
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    final carBrand = widget.rentalData['carBrand'] ?? '';
-    final carModel = widget.rentalData['carModel'] ?? '';
-    final carYear = widget.rentalData['carYear'] ?? '';
-    final price = widget.rentalData['pricePerDay'] ?? 0;
-    
-    // Safety check for timestamp
-    final rawDate = widget.rentalData['createdAt'];
-    Timestamp? timestamp;
-    if (rawDate is Timestamp) {
-      timestamp = rawDate;
-    }
+        final currentRentalData = rentalSnapshot.data?.data() as Map<String, dynamic>? ?? widget.rentalData;
+        final status = currentRentalData['status'] ?? 'pending';
 
-    final dateStr = timestamp != null
-        ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
-        : "N/A";
+        final carBrand = currentRentalData['carBrand'] ?? widget.rentalData['carBrand'] ?? '';
+        final carModel = currentRentalData['carModel'] ?? widget.rentalData['carModel'] ?? '';
+        final carYear = currentRentalData['carYear'] ?? widget.rentalData['carYear'] ?? '';
+        final price = currentRentalData['pricePerDay'] ?? widget.rentalData['pricePerDay'] ?? 0;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        title: const Text('Detalle de Solicitud'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1565C0),
-        elevation: 0,
-      ),
-      body: FutureBuilder<Map<String, dynamic>?>(
-        future: _getTenantData(),
+        // Safety check for timestamp
+        final rawDate = currentRentalData['createdAt'] ?? widget.rentalData['createdAt'];
+        Timestamp? timestamp;
+        if (rawDate is Timestamp) {
+          timestamp = rawDate;
+        }
+
+        final dateStr = timestamp != null
+            ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
+            : "N/A";
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF5F7FA),
+          appBar: AppBar(
+            title: const Text('Detalle de Solicitud'),
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF1565C0),
+            elevation: 0,
+          ),
+          body: FutureBuilder<Map<String, dynamic>?>(
+            future: _getTenantData(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -340,9 +385,11 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           );
         },
       ),
-      bottomNavigationBar: (status == 'pending' || status == 'approved')
+      bottomNavigationBar: (status == 'pending' || status == 'approved' || status == 'in_progress')
           ? _buildActionButtons(context, status)
           : null,
+      );
+      },
     );
   }
 
@@ -393,6 +440,83 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
   }
 
   Widget _buildActionButtons(BuildContext context, String status) {
+    if (status == 'in_progress') {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    final carBrand = widget.rentalData['carBrand'] ?? '';
+                    final carModel = widget.rentalData['carModel'] ?? '';
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => RastreoAutoPropietarioScreen(
+                          rentalId: widget.rentalId,
+                          carDetails: '$carBrand $carModel',
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1565C0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.my_location, color: Colors.white),
+                  label: const Text(
+                    'Rastrear Auto en Vivo',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: () => _confirmEndRental(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red, width: 2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.stop_circle_outlined, color: Colors.red),
+                  label: const Text(
+                    'Finalizar Viaje y Detener GPS',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (status == 'approved') {
       return Container(
         padding: const EdgeInsets.all(20),

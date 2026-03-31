@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'ubicacion_auto_screen.dart';
 import 'pdf_viewer_screen.dart';
+import 'arrendatario_rastreo_widget.dart';
 
 class DetalleRentaArrendatarioScreen extends StatelessWidget {
   final String rentalId;
@@ -41,16 +42,6 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = rentalData['status'] ?? 'pending';
-    final carBrand = rentalData['carBrand'] ?? '';
-    final carModel = rentalData['carModel'] ?? '';
-    final carYear = rentalData['carYear'] ?? '';
-    final price = rentalData['pricePerDay'] ?? 0;
-    final timestamp = rentalData['createdAt'] as Timestamp?;
-    final dateStr = timestamp != null
-        ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
-        : "N/A";
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -59,94 +50,154 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
         foregroundColor: const Color(0xFF1565C0), // Main blue
         elevation: 0,
       ),
-      body: FutureBuilder<Map<String, dynamic>?>(
-        future: _getOwnerData(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('rentals').doc(rentalId).snapshots(),
+        builder: (context, rentalSnapshot) {
+          if (rentalSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final userData = snapshot.data ?? {};
-          final fullName = userData['fullName'] ?? 'Propietario desconocido';
-          final email = userData['email'] ?? 'No disponible';
-          final phone = userData['phone'] ?? 'No registrado';
-          
-          String address = 'No registrada';
-          if (userData['address'] != null && userData['address'] is Map) {
-            final addr = userData['address'] as Map;
-            address = '${addr['calle'] ?? ''} ${addr['numero'] ?? ''}, ${addr['colonia'] ?? ''}';
-            if (addr['municipio'] != null) address += ', ${addr['municipio']}';
+          if (!rentalSnapshot.hasData || !rentalSnapshot.data!.exists) {
+            return const Center(child: Text("La renta no existe o fue eliminada"));
           }
 
-          final initial = fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
+          final currentRentalData = rentalSnapshot.data!.data() as Map<String, dynamic>;
+          final status = currentRentalData['status'] ?? 'pending';
+          final carBrand = currentRentalData['carBrand'] ?? '';
+          final carModel = currentRentalData['carModel'] ?? '';
+          final carYear = currentRentalData['carYear'] ?? '';
+          final price = currentRentalData['pricePerDay'] ?? 0;
+          final timestamp = currentRentalData['createdAt'] as Timestamp?;
+          final dateStr = timestamp != null
+              ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
+              : "N/A";
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. HEADER: INFO DEL PROPIETARIO
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12, left: 4),
-                  child: const Text(
-                    'Datos del Propietario',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF455A64),
-                    ),
-                  ),
-                ),
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: Colors.green[100],
-                          child: Text(
-                            initial,
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green[800],
-                            ),
+          return FutureBuilder<Map<String, dynamic>?>(
+            future: _getOwnerData(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final userData = snapshot.data ?? {};
+              final fullName = userData['fullName'] ?? 'Propietario desconocido';
+              final email = userData['email'] ?? 'No disponible';
+              final phone = userData['phone'] ?? 'No registrado';
+              
+              String address = 'No registrada';
+              if (userData['address'] != null && userData['address'] is Map) {
+                final addr = userData['address'] as Map;
+                address = '${addr['calle'] ?? ''} ${addr['numero'] ?? ''}, ${addr['colonia'] ?? ''}';
+                if (addr['municipio'] != null) address += ', ${addr['municipio']}';
+              }
+
+              final initial = fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Solo mostramos la información del propietario si el viaje no ha finalizado
+                    if (status != 'completed' && status != 'rejected') ...[
+                      // 1. HEADER: INFO DEL PROPIETARIO
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12, left: 4),
+                        child: const Text(
+                          'Datos del Propietario',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF455A64),
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                      Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
                             children: [
-                              Text(
-                                fullName,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF263238),
+                              CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Colors.green[100],
+                                child: Text(
+                                  initial,
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green[800],
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              _buildInfoRow(Icons.email_outlined, email),
-                              const SizedBox(height: 4),
-                              _buildInfoRow(Icons.phone_outlined, phone),
-                              const SizedBox(height: 4),
-                              _buildInfoRow(Icons.location_on_outlined, address, maxLines: 2),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      fullName,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF263238),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    _buildInfoRow(Icons.email_outlined, email),
+                                    const SizedBox(height: 4),
+                                    _buildInfoRow(Icons.phone_outlined, phone),
+                                    const SizedBox(height: 4),
+                                    _buildInfoRow(Icons.location_on_outlined, address, maxLines: 2),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
 
-                const SizedBox(height: 24),
-
-                // 2. ESTADO DE LA RENTA
-                if (status == 'approved') ...[
+                    // 2. ESTADO DE LA RENTA
+                    if (status == 'completed') ...[
+                      // ESTADO: FINALIZADO
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3E5F5), // Morado suave
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.purple.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.purple[800], size: 28),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Viaje Finalizado',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.purple[900],
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'El propietario ha marcado el viaje como finalizado. Por tu seguridad, los datos del propietario y vehículo se han ocultado.',
+                                    style: TextStyle(color: Colors.purple[900], fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (status == 'approved') ...[
                   // ADVERTENCIA DE PERMISO PRESENCIAL
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -218,6 +269,11 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+
+                  // AGREGAMOS EL WIDGET PARA COMPARTIR UBICACIÓN GPS
+                  const SizedBox(height: 16),
+                  ArrendatarioRastreoWidget(rentalId: rentalId),
+                  
                 ] else if (status == 'rejected') ...[
                    // ESTADO: RECHAZADA
                    Container(
@@ -485,55 +541,16 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                   ),
                 ],
 
-                const SizedBox(height: 24),
-
-                // 3. ACCIONES
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      // Acción simulada de llamar o contactar
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Abriendo marcador...')),
-                      );
-                    },
-                    icon: const Icon(Icons.call),
-                    label: const Text('Llamar al Propietario'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1565C0),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      // Acción simulada de chat
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Abriendo chat...')),
-                      );
-                    },
-                    icon: const Icon(Icons.chat_bubble_outline),
-                    label: const Text('Enviar Mensaje'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF1565C0),
-                      side: const BorderSide(color: Color(0xFF1565C0)),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
               ],
             ),
           );
         },
-      ),
-    );
-  }
+      );
+    },
+  ),
+);
+}
 
   void _openDocument(BuildContext context, String? url, String title) {
     if (url == null || url.isEmpty) {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'product_car_screen.dart';
+import 'rentar_auto_screen.dart';
 
 import '../widgets/car_image_loader.dart';
 
@@ -240,20 +240,24 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
     final model = data['model'] ?? 'Modelo';
     final year = data['year']?.toString() ?? 'N/A';
     
-    // Precio aleatorio o real si existiera
-    // final price = data['price'] ?? 'N/A'; 
-    // Usaremos un simulador visual por consistencia con el diseño anterior
-    final randomHash = autoId.hashCode;
-    final priceSimulated = (500 + (randomHash % 2000).abs()).toString();
+    // Usaremos el precio real, o un fallback
+    int actualPrice = 0;
+    if (data['pricePerDay'] != null) {
+      actualPrice = (data['pricePerDay'] as num).toInt();
+    } else {
+      final randomHash = autoId.hashCode;
+      actualPrice = 700 + (randomHash % 1500).abs();
+    }
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductCarScreen(
+            builder: (context) => RentarAutoScreen(
               autoId: autoId,
               carData: data,
+              price: actualPrice,
             ),
           ),
         );
@@ -305,7 +309,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
                         ),
                       ),
                       Text(
-                        '\$$priceSimulated / día',
+                        '\$$actualPrice / día',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -339,9 +343,9 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
                           color: Colors.grey[100],
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
-                          'Automático', // Dato mockeado, sería data['transmision'] ?? 'Estándar'
-                          style: TextStyle(fontSize: 12),
+                        child: Text(
+                          data['transmission'] ?? 'Estándar', 
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
                     ],
