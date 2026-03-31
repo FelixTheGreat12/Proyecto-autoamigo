@@ -210,6 +210,22 @@ class MisAutosScreen extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
+                                    if (autoData['pricePerDay'] != null) ...[
+                                      Icon(
+                                        Icons.attach_money,
+                                        size: 14,
+                                        color: Colors.green[700],
+                                      ),
+                                      Text(
+                                        '${autoData['pricePerDay']}/día',
+                                        style: TextStyle(
+                                          color: Colors.green[800],
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                    ],
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,

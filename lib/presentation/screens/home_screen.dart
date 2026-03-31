@@ -409,10 +409,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   final model = data['model'] ?? 'Modelo desconocido';
                   final year = data['year'] ?? '';
 
-                  // Precio aleatorio (temporal)
-                  // Usamos el hash del ID para que el precio sea fijo para cada auto
-                  final random = Random(autoId.hashCode);
-                  final price = 500 + random.nextInt(2000); // Entre 500 y 2500
+                  // Price from database or fallback if old data
+                  double rawPrice = 0.0;
+                  if (data['pricePerDay'] != null) {
+                    rawPrice = (data['pricePerDay'] as num).toDouble();
+                  } else {
+                    final random = Random(autoId.hashCode);
+                    rawPrice = 700.0 + random.nextInt(1500); // Fallback para datos viejos
+                  }
+                  final int price = rawPrice.toInt();
 
                   // Intentamos sacar la URL de la imagen principal si existe en
                   // la subcolección 'documentos'. Como aquí no tenemos fácil acceso

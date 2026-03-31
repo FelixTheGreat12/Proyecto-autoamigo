@@ -283,6 +283,10 @@ class ProductCarScreen extends StatelessWidget {
                   _buildInfoRow(Icons.settings, 'Transmisión', transmission),
                   const Divider(height: 24),
                   _buildInfoRow(Icons.confirmation_number, 'Placas', plate),
+                  if (carData['pricePerDay'] != null) ...[
+                    const Divider(height: 24),
+                    _buildInfoRow(Icons.attach_money, 'Precio por día', '\$${carData['pricePerDay']} MXN'),
+                  ],
                 ],
               ),
             ),

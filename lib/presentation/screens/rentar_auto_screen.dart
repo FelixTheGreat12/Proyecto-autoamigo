@@ -34,7 +34,7 @@ class RentarAutoScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _solicitarRenta(BuildContext context) async {
+  Future<void> _solicitarRenta(BuildContext context, DateTime startDate, DateTime endDate, double total) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -59,6 +59,9 @@ class RentarAutoScreen extends StatelessWidget {
         'status': 'pending', // pending, approved, rejected, completed
         'createdAt': FieldValue.serverTimestamp(),
         'pricePerDay': price,
+        'totalPrice': total,
+        'startDate': startDate.toIso8601String(),
+        'endDate': endDate.toIso8601String(),
         'carBrand': carData['brand'],
         'carModel': carData['model'],
         'carYear': carData['year'],
@@ -78,17 +81,280 @@ class RentarAutoScreen extends StatelessWidget {
         
         // Regresar al Home
         Navigator.pop(context);
+        Navigator.pop(context); // Cerrar el bottomsheet de checkout
       }
     } catch (e) {
-      if (context.mounted) Navigator.pop(context); // Cerrar loading si falla
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al solicitar renta: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (context.mounted) {
+        Navigator.pop(context); // Cerrar loading si falla
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al solicitar renta: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  Widget _buildPriceRow(String label, String value, {bool isFee = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                color: isFee ? Colors.grey[700] : Colors.black87,
+              ),
+            ),
+            if (isFee) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.info_outline, size: 16, color: Colors.grey[400]),
+            ],
+          ],
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isFee ? Colors.grey[700] : Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _mostrarCheckoutFront(BuildContext context) async {
+    // 1. Mostrar selector de fechas
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Selecciona las fechas de renta',
+      cancelText: 'CERRAR',
+      confirmText: 'CONTINUAR',
+      saveText: 'LISTO',
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF1565C0),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked == null) return; // El usuario canceló la selección de fechas
+
+    // 2. Calcular días y costos
+    final int days = picked.end.difference(picked.start).inDays + 1; // +1 si rentar hoy y devolver hoy es 1 día
+    final double subtotal = (price * days).toDouble();
+    final double serviceFee = subtotal * 0.10; // 10% de tarifa de servicio
+    final double total = subtotal + serviceFee;
+    
+    // Función auxiliar para meses
+    String obtenerMes(int mes) {
+      const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      return meses[mes - 1];
+    }
+
+    // 3. Mostrar BottomSheet interactivo como Checkout
+    if (!context.mounted) return;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(32),
+              topRight: Radius.circular(32),
+            ),
+          ),
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 16,
+            bottom: MediaQuery.of(bottomSheetContext).padding.bottom + 24, // Área segura inferior
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Manija superior
+              Center(
+                child: Container(
+                  width: 50,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Título y Cerrar
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Confirma tu renta',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF263238),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(bottomSheetContext),
+                    icon: Icon(Icons.close, color: Colors.grey[600]),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Fechas en tarjetas llamativas
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.blue[100]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.calendar_today, size: 16, color: Colors.blue[800]),
+                              const SizedBox(width: 8),
+                              Text('ENTREGA', style: TextStyle(color: Colors.blue[800], fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '${picked.start.day} ${obtenerMes(picked.start.month)} ${picked.start.year}',
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Icon(Icons.arrow_forward, color: Colors.grey, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.blue[100]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.event_available, size: 16, color: Colors.blue[800]),
+                              const SizedBox(width: 8),
+                              Text('DEVOLUCIÓN', style: TextStyle(color: Colors.blue[800], fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '${picked.end.day} ${obtenerMes(picked.end.month)} ${picked.end.year}',
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              const Text(
+                'Desglose de pago',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF263238)),
+              ),
+              const SizedBox(height: 16),
+
+              // Desglose de precios
+              _buildPriceRow(
+                'Tarifa base (\$$price x $days ${days == 1 ? "día" : "días"})',
+                '\$${subtotal.toStringAsFixed(2)}',
+              ),
+              const SizedBox(height: 12),
+              _buildPriceRow(
+                'Tarifa de servicio',
+                '\$${serviceFee.toStringAsFixed(2)}',
+                isFee: true,
+              ),
+              
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16.0),
+                child: Divider(),
+              ),
+              
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total (MXN)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(
+                    '\$${total.toStringAsFixed(2)}', 
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1565C0))
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 32),
+              
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () => _solicitarRenta(context, picked.start, picked.end, total),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1565C0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 4,
+                  ),
+                  child: const Text(
+                    'Confirmar y Solicitar',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -472,7 +738,7 @@ class RentarAutoScreen extends StatelessWidget {
             child: SizedBox(
               height: 56,
               child: ElevatedButton(
-                onPressed: () => _solicitarRenta(context),
+                onPressed: () => _mostrarCheckoutFront(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1565C0),
                   shape: RoundedRectangleBorder(
