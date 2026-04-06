@@ -9,10 +9,12 @@ class SubirDocumentosUsuarioScreen extends StatefulWidget {
   const SubirDocumentosUsuarioScreen({super.key});
 
   @override
-  State<SubirDocumentosUsuarioScreen> createState() => _SubirDocumentosUsuarioScreenState();
+  State<SubirDocumentosUsuarioScreen> createState() =>
+      _SubirDocumentosUsuarioScreenState();
 }
 
-class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScreen> {
+class _SubirDocumentosUsuarioScreenState
+    extends State<SubirDocumentosUsuarioScreen> {
   final FileUploadService _uploadService = FileUploadService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -73,16 +75,16 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
 
   Future<void> _pickFile(String documentType) async {
     final extensions = ['jpg', 'png', 'jpeg', 'pdf'];
-    
+
     // Asumimos que pickFile devuelve un PlatformFile o similar del upload_service
     // Nota: Si FileUploadService usa file_picker, devuelve PlatformFile.
     // Revisar la implementación de FileUploadService en tu proyecto si falla.
     final platformFile = await _uploadService.pickFile(
       allowedExtensions: extensions,
     );
-    
+
     if (platformFile == null) return;
-    
+
     setState(() {
       _selectedFiles[documentType] = platformFile;
       _fileNames[documentType] = platformFile.name;
@@ -96,7 +98,8 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
     // Validar que tengamos al menos un documento o existente
     bool hasAny = false;
     for (var key in _selectedFiles.keys) {
-      if (_selectedFiles[key] != null || (_uploadedUrls[key] != null && _uploadedUrls[key] != '')) {
+      if (_selectedFiles[key] != null ||
+          (_uploadedUrls[key] != null && _uploadedUrls[key] != '')) {
         hasAny = true;
         break;
       }
@@ -121,7 +124,7 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
 
         // Subir a Storage
         String? downloadUrl;
-        
+
         // Dependiendo de si es Web o Mobile (bytes vs path)
         if (platformFile.bytes != null) {
           downloadUrl = await _uploadService.uploadData(
@@ -157,16 +160,21 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Documentos guardados correctamente'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Documentos guardados correctamente'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context);
       }
-
     } catch (e) {
       debugPrint('Error subiendo documentos: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error al guardar: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -196,15 +204,18 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
                     style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   _buildUploadCard('INE / IFE', Icons.credit_card),
                   const SizedBox(height: 16),
                   _buildUploadCard('Licencia', Icons.directions_car),
                   const SizedBox(height: 16),
-                  _buildUploadCard('Comprobante', Icons.home_work_outlined), // Comprobante de domicilio
+                  _buildUploadCard(
+                    'Comprobante',
+                    Icons.home_work_outlined,
+                  ), // Comprobante de domicilio
 
                   const SizedBox(height: 40),
-                  
+
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -212,11 +223,19 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1565C0),
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: _isUploading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Guardar Documentos', style: TextStyle(fontSize: 16, color: Colors.white)),
+                          : const Text(
+                              'Guardar Documentos',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -228,7 +247,7 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
   Widget _buildUploadCard(String label, IconData icon) {
     final localName = _fileNames[label];
     final existingUrl = _uploadedUrls[label];
-    
+
     final bool hasFile = localName != null;
     final bool hasUrl = existingUrl != null && existingUrl.isNotEmpty;
     final bool isCompleted = hasFile || hasUrl;
@@ -237,7 +256,9 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: isCompleted ? Colors.blue[200]! : Colors.grey[300]!),
+        side: BorderSide(
+          color: isCompleted ? Colors.blue[200]! : Colors.grey[300]!,
+        ),
       ),
       child: InkWell(
         onTap: () => _pickFile(label),
@@ -254,7 +275,9 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
                 ),
                 child: Icon(
                   icon,
-                  color: isCompleted ? const Color(0xFF1565C0) : Colors.grey[400],
+                  color: isCompleted
+                      ? const Color(0xFF1565C0)
+                      : Colors.grey[400],
                 ),
               ),
               const SizedBox(width: 16),
@@ -272,11 +295,15 @@ class _SubirDocumentosUsuarioScreenState extends State<SubirDocumentosUsuarioScr
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      hasFile 
+                      hasFile
                           ? 'Archivo seleccionado: $localName'
-                          : (hasUrl ? 'Documento ya subido' : 'Toque para seleccionar'),
+                          : (hasUrl
+                                ? 'Documento ya subido'
+                                : 'Toque para seleccionar'),
                       style: TextStyle(
-                        color: hasFile ? Colors.green[700] : (hasUrl ? Colors.blue[700] : Colors.grey[500]),
+                        color: hasFile
+                            ? Colors.green[700]
+                            : (hasUrl ? Colors.blue[700] : Colors.grey[500]),
                         fontSize: 12,
                       ),
                     ),

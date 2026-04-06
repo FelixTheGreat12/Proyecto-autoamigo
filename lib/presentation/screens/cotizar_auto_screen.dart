@@ -25,15 +25,38 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
   String? selectedModel;
   String? selectedColor;
   String? selectedTransmission;
+  String? selectedEngine;
 
   final years = List<String>.generate(9, (i) => '${2024 - i}');
 
   final List<String> colors = [
-    'Blanco', 'Negro', 'Gris', 'Plata', 'Azul', 'Rojo', 'Café', 'Beige', 'Verde', 'Amarillo'
+    'Blanco',
+    'Negro',
+    'Gris',
+    'Plata',
+    'Azul',
+    'Rojo',
+    'Café',
+    'Beige',
+    'Verde',
+    'Amarillo',
   ];
 
   final List<String> transmissions = [
-    'Automática', 'Estándar', 'CVT', 'DSG', 'Tiptronic'
+    'Automática',
+    'Estándar',
+    'CVT',
+    'DSG',
+    'Tiptronic',
+  ];
+
+  final List<String> engines = [
+    '1.0L - 1.2L',
+    '1.4L - 1.5L',
+    '1.6L - 1.8L',
+    '2.0L - 2.4L',
+    '2.5L - 2.9L',
+    '3.0L o más',
   ];
 
   final Map<String, List<String>> brandsWithModels = {
@@ -64,8 +87,11 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
       selectedModel = widget.existingData!['model'];
       selectedColor = widget.existingData!['color'];
       selectedTransmission = widget.existingData!['transmission'];
+      selectedEngine = widget.existingData!['engine'];
       _plateController.text = widget.existingData!['plate'] ?? '';
-      if (widget.existingData!['pricePerDay'] != null) {
+      if (widget.existingData!['pricePerKm'] != null) {
+        _priceController.text = widget.existingData!['pricePerKm'].toString();
+      } else if (widget.existingData!['pricePerDay'] != null) {
         _priceController.text = widget.existingData!['pricePerDay'].toString();
       }
     }
@@ -125,6 +151,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                       const SizedBox(height: 12),
                       _buildDropdownTransmission(),
                       const SizedBox(height: 12),
+                      _buildDropdownEngine(),
+                      const SizedBox(height: 12),
                       _buildPlateInput(),
                       const SizedBox(height: 12),
                       _buildPriceInput(),
@@ -153,13 +181,24 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                         const SizedBox(width: 12),
                         Expanded(child: _buildDropdownTransmission()),
                         const SizedBox(width: 12),
+                        Expanded(child: _buildDropdownEngine()),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
                         Expanded(child: _buildPlateInput()),
                         const SizedBox(width: 12),
                         Expanded(child: _buildPriceInput()),
+                        const SizedBox(width: 12),
+                        const Spacer(), // Spacer to balance columns with the row above
                       ],
                     ),
                     const SizedBox(height: 24),
-                    SizedBox(width: double.infinity, child: _buildCotizarButton(isEditing)),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _buildCotizarButton(isEditing),
+                    ),
                   ],
                 );
               },
@@ -240,22 +279,26 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     );
   }
 
-  Widget _buildDropdownColor() {  
+  Widget _buildDropdownColor() {
     return GestureDetector(
       onTap: _isSaving ? null : _showColorPicker,
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: 'Color',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             if (selectedColor == null)
-              const Text('Selecciona un color',
-                  style: TextStyle(color: Colors.black54))
+              const Text(
+                'Selecciona un color',
+                style: TextStyle(color: Colors.black54),
+              )
             else
               Row(
                 children: [
@@ -343,17 +386,21 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                               color: Colors.grey.withValues(alpha: 0.2),
                               spreadRadius: 1,
                               blurRadius: 3,
-                            )
+                            ),
                           ],
                         ),
                         child: null,
                       ),
                       const SizedBox(height: 4),
-                      Text(color,
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight:
-                                  isSelected ? FontWeight.bold : FontWeight.normal)),
+                      Text(
+                        color,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -364,7 +411,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancelar'),
-            )
+            ),
           ],
         );
       },
@@ -394,6 +441,29 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     );
   }
 
+  Widget _buildDropdownEngine() {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: 'Motor',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: selectedEngine,
+          hint: const Text('Cilindrada'),
+          onChanged: _isSaving
+              ? null
+              : (v) => setState(() => selectedEngine = v),
+          items: engines
+              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+              .toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPlateInput() {
     return TextField(
       controller: _plateController,
@@ -417,8 +487,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
   }
 
   Widget _buildPriceInput() {
-    final double suggestedPrice = _getSuggestedPrice();
-    
+    final double suggestedPrice = _getSuggestedPricePerKm();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -430,8 +500,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
             FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
           ],
           decoration: InputDecoration(
-            labelText: 'Precio por día',
-            hintText: 'Ej. 500',
+            labelText: 'Tarifa por km (MXN)',
+            hintText: 'Ej. 4.50',
             prefixIcon: const Icon(Icons.attach_money),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(
@@ -445,10 +515,14 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
             padding: const EdgeInsets.only(top: 6.0, left: 4.0),
             child: Row(
               children: [
-                Icon(Icons.lightbulb_outline, size: 14, color: Colors.amber[700]),
+                Icon(
+                  Icons.lightbulb_outline,
+                  size: 14,
+                  color: Colors.amber[700],
+                ),
                 const SizedBox(width: 4),
                 Text(
-                  'Sugerido: \$${suggestedPrice.toStringAsFixed(0)}',
+                  'Sugerido: \$${suggestedPrice.toStringAsFixed(2)} / km',
                   style: TextStyle(
                     color: Colors.grey[700],
                     fontSize: 12,
@@ -459,7 +533,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                 GestureDetector(
                   onTap: () {
                     setState(() {
-                      _priceController.text = suggestedPrice.toStringAsFixed(0);
+                      _priceController.text = suggestedPrice.toStringAsFixed(2);
                     });
                   },
                   child: const Text(
@@ -478,45 +552,67 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     );
   }
 
-  double _getSuggestedPrice() {
-    if (selectedYear == null || selectedBrand == null || selectedModel == null || selectedTransmission == null) return 0.0;
-    
-    // Precio base realista asumiendo desgaste, seguro y mercado de renta (p/ej en México)
-    double basePrice = 700.0; 
-    
-    // 1. Extra por el año del coche (mientras más nuevo, más caro)
-    int year = int.tryParse(selectedYear!) ?? 2015;
-    if (year >= 2024) {
-      basePrice += 600;
-    } else if (year >= 2021) {
-      basePrice += 400;
-    } else if (year >= 2018) {
-      basePrice += 200;
-    } else if (year >= 2016) {
-      basePrice += 100;
+  double _getSuggestedPricePerKm() {
+    if (selectedEngine == null) return 0.0;
+
+    double gasPrice = 25.0; // Precio gasolina estimado mxn
+    double gasCostPerKm = 0.0;
+    double maintenancePerKm = 1.0;
+    double ownerProfitPerKm = 2.0;
+
+    switch (selectedEngine) {
+      case '1.0L - 1.2L':
+        gasCostPerKm = gasPrice / 18.0;
+        maintenancePerKm = 0.8;
+        break;
+      case '1.4L - 1.5L':
+        gasCostPerKm = gasPrice / 15.0;
+        maintenancePerKm = 0.9;
+        break;
+      case '1.6L - 1.8L':
+        gasCostPerKm = gasPrice / 13.0;
+        maintenancePerKm = 1.0;
+        break;
+      case '2.0L - 2.4L':
+        gasCostPerKm = gasPrice / 11.0;
+        maintenancePerKm = 1.2;
+        break;
+      case '2.5L - 2.9L':
+        gasCostPerKm = gasPrice / 9.0;
+        maintenancePerKm = 1.5;
+        break;
+      case '3.0L o más':
+        gasCostPerKm = gasPrice / 7.0;
+        maintenancePerKm = 1.8;
+        break;
+      default:
+        gasCostPerKm = gasPrice / 13.0;
     }
-    
-    // 2. Extra por la categoría/segmento del vehículo
-    // Sedanes medianos (Alta demanda y buen espacio)
-    if (['Jetta', 'Sentra', 'Civic', 'Corolla', 'Focus'].contains(selectedModel)) {
-      basePrice += 350;
-    } 
-    // Compactos (Buen rendimiento, espacio aceptable)
-    else if (['Versa', 'Vento', 'Rio', 'K3', 'Aveo', 'Accent', 'i20', 'Fiesta', 'Yaris', 'City'].contains(selectedModel)) {
-      basePrice += 150;
+
+    // Extra ganancia por año del auto
+    if (selectedYear != null) {
+      int year = int.tryParse(selectedYear!) ?? 2015;
+      if (year >= 2024)
+        ownerProfitPerKm += 1.0;
+      else if (year >= 2021)
+        ownerProfitPerKm += 0.5;
     }
-    // Vehículos familiares/amplios
-    else if (['Avanza'].contains(selectedModel)) {
-      basePrice += 450;
+
+    // Extra ganancia por segmento (Sedan mediano/SUV vs Compacto)
+    if (selectedModel != null) {
+      if ([
+        'Jetta',
+        'Sentra',
+        'Civic',
+        'Corolla',
+        'Focus',
+        'Avanza',
+      ].contains(selectedModel)) {
+        ownerProfitPerKm += 0.5;
+      }
     }
-    // Subcompactos (Spark, Beat, March, Gol, etc.) se mantienen en la base + 0
-    
-    // 3. Extra por tipo de transmisión (Las automáticas suelen ser más demandadas y caras)
-    if (['Automática', 'CVT', 'DSG', 'Tiptronic'].contains(selectedTransmission)) {
-      basePrice += 120;
-    }
-    
-    return basePrice;
+
+    return gasCostPerKm + maintenancePerKm + ownerProfitPerKm;
   }
 
   Future<void> _saveOrUpdateAuto() async {
@@ -527,6 +623,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
         selectedModel == null ||
         selectedColor == null ||
         selectedTransmission == null ||
+        selectedEngine == null ||
         _plateController.text.trim().isEmpty ||
         _priceController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -539,7 +636,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     final plateText = _plateController.text.trim();
     // Regex: 3 letras, guion, 2 numeros, guion, 2 numeros
     final plateRegex = RegExp(r'^[A-Z]{3}-[0-9]{2}-[0-9]{2}$');
-    
+
     if (!plateRegex.hasMatch(plateText)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -550,8 +647,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
       return;
     }
 
-    final double? pricePerDay = double.tryParse(_priceController.text.trim());
-    if (pricePerDay == null || pricePerDay <= 0) {
+    final double? pricePerKm = double.tryParse(_priceController.text.trim());
+    if (pricePerKm == null || pricePerKm <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Por favor ingresa un precio válido mayor a 0'),
@@ -583,8 +680,9 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
         'model': selectedModel,
         'color': selectedColor,
         'transmission': selectedTransmission,
+        'engine': selectedEngine,
         'plate': _plateController.text.trim().toUpperCase(),
-        'pricePerDay': pricePerDay,
+        'pricePerKm': pricePerKm,
         'userId': userId,
       };
 
@@ -611,7 +709,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
       } else {
         // --- MODO CREACIÓN (DIFERIDO) ---
         // NO guardamos en Firestore todavía. Pasamos los datos en memoria.
-        
+
         if (!mounted) return;
 
         Navigator.push(
@@ -667,7 +765,9 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
 class PlacaInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     // 1. Normalizar: Mayúsculas y quitar guiones
     String newText = newValue.text.toUpperCase().replaceAll('-', '');
 

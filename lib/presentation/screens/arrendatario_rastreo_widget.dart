@@ -6,13 +6,18 @@ import 'package:geolocator/geolocator.dart';
 // Tracker global para mantener viva la conexión aunque salgamos de la pantalla
 class RentalLocationTracker {
   static final Map<String, StreamSubscription<Position>> _activeStreams = {};
-  static final Map<String, StreamSubscription<DocumentSnapshot>> _statusStreams = {};
+  static final Map<String, StreamSubscription<DocumentSnapshot>>
+  _statusStreams = {};
 
-  static bool isTracking(String rentalId) => _activeStreams.containsKey(rentalId);
+  static bool isTracking(String rentalId) =>
+      _activeStreams.containsKey(rentalId);
 
-  static void startTracking(String rentalId, StreamSubscription<Position> locationStream) {
+  static void startTracking(
+    String rentalId,
+    StreamSubscription<Position> locationStream,
+  ) {
     _activeStreams[rentalId] = locationStream;
-    
+
     // Y crear un listener global a la BD para que si el arrendador apaga el viaje,
     // nosotros apaguemos automáticamente nuestro propio stream de ubicación en cualquier momento.
     _statusStreams[rentalId] = FirebaseFirestore.instance
@@ -20,13 +25,13 @@ class RentalLocationTracker {
         .doc(rentalId)
         .snapshots()
         .listen((snapshot) {
-      if (snapshot.exists) {
-        final data = snapshot.data() as Map<String, dynamic>;
-        if (data['status'] == 'completed') {
-          stopTracking(rentalId);
-        }
-      }
-    });
+          if (snapshot.exists) {
+            final data = snapshot.data() as Map<String, dynamic>;
+            if (data['status'] == 'completed') {
+              stopTracking(rentalId);
+            }
+          }
+        });
   }
 
   static void stopTracking(String rentalId) {
@@ -44,7 +49,8 @@ class ArrendatarioRastreoWidget extends StatefulWidget {
   const ArrendatarioRastreoWidget({super.key, required this.rentalId});
 
   @override
-  State<ArrendatarioRastreoWidget> createState() => _ArrendatarioRastreoWidgetState();
+  State<ArrendatarioRastreoWidget> createState() =>
+      _ArrendatarioRastreoWidgetState();
 }
 
 class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
@@ -69,7 +75,9 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Por motivos de seguridad, solo el arrendador puede detener el viaje.'),
+            content: Text(
+              'Por motivos de seguridad, solo el arrendador puede detener el viaje.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -84,7 +92,11 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
     if (!serviceEnabled) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Por favor, activa el GPS en los ajustes de tu celular.')),
+          const SnackBar(
+            content: Text(
+              'Por favor, activa el GPS en los ajustes de tu celular.',
+            ),
+          ),
         );
       }
       return;
@@ -96,7 +108,9 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
       if (permission == LocationPermission.denied) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Los permisos de ubicación fueron denegados.')),
+            const SnackBar(
+              content: Text('Los permisos de ubicación fueron denegados.'),
+            ),
           );
         }
         return;
@@ -106,7 +120,11 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
     if (permission == LocationPermission.deniedForever) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Los permisos de ubicación están denegados permanentemente, configúralos en tus ajustes.')),
+          const SnackBar(
+            content: Text(
+              'Los permisos de ubicación están denegados permanentemente, configúralos en tus ajustes.',
+            ),
+          ),
         );
       }
       return;
@@ -121,12 +139,43 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
       distanceFilter: 10, // Actualiza solo si se mueve 10 metros
     );
 
-    final stream = Geolocator.getPositionStream(locationSettings: locationSettings).listen((Position position) {
-      FirebaseFirestore.instance.collection('rentals').doc(widget.rentalId).update({
-        'currentLocation': GeoPoint(position.latitude, position.longitude),
-        'lastLocationUpdate': FieldValue.serverTimestamp(),
-      });
-    });
+    Position? lastPosition;
+
+    final stream =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+          (Position position) {
+            double distanceAddedKm = 0.0;
+
+            if (lastPosition != null) {
+              final double distanceMeters = Geolocator.distanceBetween(
+                lastPosition!.latitude,
+                lastPosition!.longitude,
+                position.latitude,
+                position.longitude,
+              );
+              distanceAddedKm = distanceMeters / 1000.0;
+            }
+
+            final Map<String, dynamic> updates = {
+              'currentLocation': GeoPoint(
+                position.latitude,
+                position.longitude,
+              ),
+              'lastLocationUpdate': FieldValue.serverTimestamp(),
+            };
+
+            if (distanceAddedKm > 0) {
+              updates['distanciaRecorridaKm'] = FieldValue.increment(distanceAddedKm);
+            }
+
+            FirebaseFirestore.instance
+                .collection('rentals')
+                .doc(widget.rentalId)
+                .update(updates);
+
+            lastPosition = position;
+          },
+        );
 
     RentalLocationTracker.startTracking(widget.rentalId, stream);
   }
@@ -146,7 +195,9 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
       decoration: BoxDecoration(
         color: _isTracking ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _isTracking ? Colors.green.shade300 : Colors.orange.shade300),
+        border: Border.all(
+          color: _isTracking ? Colors.green.shade300 : Colors.orange.shade300,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,7 +212,9 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  _isTracking ? 'Transmitiendo ubicación GPS...' : 'Ubicación Pausada',
+                  _isTracking
+                      ? 'Transmitiendo ubicación GPS...'
+                      : 'Ubicación Pausada',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: _isTracking ? Colors.green[900] : Colors.orange[900],
@@ -195,12 +248,16 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isTracking ? Colors.grey[700] : Colors.green[700],
+                backgroundColor: _isTracking
+                    ? Colors.grey[700]
+                    : Colors.green[700],
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );

@@ -10,9 +10,10 @@ class PDFViewerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Detectar si es una imagen simple por la extensión
-    final isImage = url.toLowerCase().contains('.jpg') || 
-                    url.toLowerCase().contains('.jpeg') || 
-                    url.toLowerCase().contains('.png');
+    final isImage =
+        url.toLowerCase().contains('.jpg') ||
+        url.toLowerCase().contains('.jpeg') ||
+        url.toLowerCase().contains('.png');
 
     return Scaffold(
       appBar: AppBar(
@@ -35,7 +36,7 @@ class PDFViewerScreen extends StatelessWidget {
             )
           : SfPdfViewer.network(
               url,
-              enableTextSelection: false, 
+              enableTextSelection: false,
               canShowScrollHead: false,
               pageLayoutMode: PdfPageLayoutMode.continuous,
             ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'rentar_auto_screen.dart';
 
 import '../widgets/car_image_loader.dart';
@@ -14,11 +16,28 @@ class BuscarAutoScreen extends StatefulWidget {
 class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
-  
+
   // Filtros seleccionados
   String? _selectedBrand;
-  RangeValues _priceRange = const RangeValues(0, 5000);
-  final List<String> _brands = ['Chevrolet', 'Nissan', 'Volkswagen', 'Toyota', 'Ford', 'Honda', 'Kia', 'Mazda'];
+  RangeValues _priceRange = const RangeValues(0, 30);
+  
+  // Ubicación y distancias
+  Position? _currentPosition;
+  bool _locating = false;
+  final Map<String, double> _ownerDistances = {};
+  final Map<String, String> _ownerMunicipios = {};
+  final Set<String> _fetchingOwners = {};
+
+  final List<String> _brands = [
+    'Chevrolet',
+    'Nissan',
+    'Volkswagen',
+    'Toyota',
+    'Ford',
+    'Honda',
+    'Kia',
+    'Mazda',
+  ];
 
   double _calculateSimulatedPrice(String autoId) {
     final randomHash = autoId.hashCode;
@@ -28,11 +47,89 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
   @override
   void initState() {
     super.initState();
+    _initLocation();
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
       });
     });
+  }
+
+  Future<void> _initLocation() async {
+    setState(() => _locating = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+      if (permission == LocationPermission.deniedForever) return;
+
+      _currentPosition = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+      );
+    } catch (e) {
+      debugPrint("Error obteniendo ubicación: $e");
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  Future<void> _fetchOwnerLocationAsync(String ownerId) async {
+    if (_currentPosition == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(ownerId).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        if (data['address'] != null && data['address'] is Map) {
+          final addr = data['address'] as Map;
+          String fullAddress = '${addr['calle'] ?? ''} ${addr['numeroExterior'] ?? ''}'.trim();
+          if (addr['colonia'] != null) fullAddress += ', ${addr['colonia']}';
+          if (addr['municipio'] != null) fullAddress += ', ${addr['municipio']}';
+          if (addr['estado'] != null) fullAddress += ', ${addr['estado']}';
+
+          String municipio = addr['municipio']?.toString() ?? 'Desconocido';
+
+          if (fullAddress.isNotEmpty) {
+            List<Location> locations = await locationFromAddress(fullAddress);
+            if (locations.isNotEmpty) {
+              final target = locations.first;
+              double distanceMeters = Geolocator.distanceBetween(
+                _currentPosition!.latitude, 
+                _currentPosition!.longitude, 
+                target.latitude, 
+                target.longitude
+              );
+              if (mounted) {
+                setState(() {
+                  _ownerDistances[ownerId] = distanceMeters / 1000; // km
+                  _ownerMunicipios[ownerId] = municipio;
+                });
+              }
+              return;
+            }
+          }
+        }
+      }
+      
+      // Fallback si no hay dirección o no se pudo codificar
+      if (mounted) {
+        setState(() {
+          _ownerDistances[ownerId] = -1; // -1 indica no disponible
+          _ownerMunicipios[ownerId] = 'Ubicación oculta';
+        });
+      }
+    } catch (e) {
+      debugPrint("Error geocodificando owner $ownerId: $e");
+      if (mounted) {
+        setState(() {
+          _ownerDistances[ownerId] = -1;
+          _ownerMunicipios[ownerId] = 'Desconocido';
+        });
+      }
+    }
   }
 
   @override
@@ -43,7 +140,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
 
   @override
   Widget build(BuildContext context) {
-     return Scaffold(
+    return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA), // Mismo fondo que Home
       appBar: AppBar(
         title: const Text(
@@ -61,7 +158,6 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
             icon: const Icon(Icons.tune_rounded, color: Color(0xFF1565C0)),
             tooltip: 'Filtros avanzados',
             onPressed: () {
-              // TODO: Mostrar bottom sheet de filtros
               _showFilterModal(context);
             },
           ),
@@ -76,7 +172,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -125,7 +221,9 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
                         selectedColor: const Color(0xFF1565C0),
                         labelStyle: TextStyle(
                           color: isSelected ? Colors.white : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                         backgroundColor: Colors.grey[100],
                         side: BorderSide.none,
@@ -138,9 +236,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
           ),
 
           // 2. RESULTADOS
-          Expanded(
-            child: _buildResultsList(),
-          ),
+          Expanded(child: _buildResultsList()),
         ],
       ),
     );
@@ -168,7 +264,8 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('autos')
-          .where('status', isEqualTo: 'registrado')
+          // En vez de filtrar aquí, lo procesaremos localmente o usaremos el where de ambas condiciones
+          // where('status', isEqualTo: 'registrado') // <-- Removido para poder mostrar los ocupados
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -180,36 +277,84 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
         }
 
         final docs = snapshot.data?.docs ?? [];
-        
+
         // --- FILTRADO LOCAL ---
         final filteredDocs = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
+          final status = (data['status'] ?? '').toString();
+          
+          // Mostrar solo "registrado" o "ocupado"
+          if (status != 'registrado' && status != 'ocupado') return false;
+
           final brand = (data['brand'] ?? '').toString();
           final model = (data['model'] ?? '').toString();
 
           // Filtro de texto (búsqueda parcial en marca o modelo)
-          final matchesSearch = _searchQuery.isEmpty || 
-              brand.toLowerCase().contains(_searchQuery) || 
+          final matchesSearch =
+              _searchQuery.isEmpty ||
+              brand.toLowerCase().contains(_searchQuery) ||
               model.toLowerCase().contains(_searchQuery);
 
-
           // Filtro de marca (chip seleccionado)
-          final matchesBrand = _selectedBrand == null || 
+          final matchesBrand =
+              _selectedBrand == null ||
               brand.toLowerCase() == _selectedBrand!.toLowerCase();
 
-          // Filtro de precio
-          final price = _calculateSimulatedPrice(doc.id);
-          final matchesPrice = price >= _priceRange.start && price <= _priceRange.end;
+          // Filtro de precio por km
+          double price = 0;
+          if (data['pricePerKm'] != null) {
+            price = (data['pricePerKm'] as num).toDouble();
+          } else if (data['pricePerDay'] != null) {
+            price = (data['pricePerDay'] as num).toDouble();
+          } else {
+            price = _calculateSimulatedPrice(doc.id) / 100; //Fallback ajustado
+          }
+
+          final matchesPrice =
+              price >= _priceRange.start && price <= _priceRange.end;
 
           return matchesSearch && matchesBrand && matchesPrice;
         }).toList();
+
+        // --- ORDENAR POR DISTANCIA Y OBTENER UBICACIONES FALTANTES ---
+        if (_currentPosition != null) {
+          for (var doc in filteredDocs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final ownerId = data['userId']?.toString();
+            if (ownerId != null) {
+              if (!_ownerDistances.containsKey(ownerId) && !_fetchingOwners.contains(ownerId)) {
+                _fetchingOwners.add(ownerId);
+                _fetchOwnerLocationAsync(ownerId);
+              }
+            }
+          }
+
+          filteredDocs.sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aOwnerId = aData['userId']?.toString() ?? '';
+            final bOwnerId = bData['userId']?.toString() ?? '';
+
+            final aDist = _ownerDistances[aOwnerId] ?? double.infinity;
+            final bDist = _ownerDistances[bOwnerId] ?? double.infinity;
+
+            final aVal = aDist < 0 ? double.infinity : aDist;
+            final bVal = bDist < 0 ? double.infinity : bDist;
+
+            return aVal.compareTo(bVal);
+          });
+        }
 
         if (filteredDocs.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.broken_image_rounded, size: 60, color: Colors.grey[300]),
+                Icon(
+                  Icons.broken_image_rounded,
+                  size: 60,
+                  color: Colors.grey[300],
+                ),
                 const SizedBox(height: 10),
                 Text(
                   'No encontramos autos con esa descripción',
@@ -239,15 +384,21 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
     final brand = data['brand'] ?? 'Marca';
     final model = data['model'] ?? 'Modelo';
     final year = data['year']?.toString() ?? 'N/A';
-    
-    // Usaremos el precio real, o un fallback
-    int actualPrice = 0;
-    if (data['pricePerDay'] != null) {
-      actualPrice = (data['pricePerDay'] as num).toInt();
+
+    // Usaremos el precio real por km, o un fallback ajustado a km
+    double actualPrice = 0;
+    if (data['pricePerKm'] != null) {
+      actualPrice = (data['pricePerKm'] as num).toDouble();
+    } else if (data['pricePerDay'] != null) {
+      actualPrice = (data['pricePerDay'] as num).toDouble();
     } else {
-      final randomHash = autoId.hashCode;
-      actualPrice = 700 + (randomHash % 1500).abs();
+      actualPrice = _calculateSimulatedPrice(autoId) / 100;
     }
+
+    final ownerId = data['userId']?.toString();
+    final double? distance = ownerId != null ? _ownerDistances[ownerId] : null;
+    final String? municipio = ownerId != null ? _ownerMunicipios[ownerId] : null;
+    final bool isOccupied = data['status'] == 'ocupado';
 
     return GestureDetector(
       onTap: () {
@@ -257,7 +408,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
             builder: (context) => RentarAutoScreen(
               autoId: autoId,
               carData: data,
-              price: actualPrice,
+              pricePerKm: actualPrice.toDouble(),
             ),
           ),
         );
@@ -269,7 +420,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               spreadRadius: 1,
               blurRadius: 10,
               offset: const Offset(0, 4),
@@ -284,14 +435,33 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
               height: 150,
               width: double.infinity,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: CarImageLoader(
-                  autoId: autoId,
-                  fit: BoxFit.cover,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CarImageLoader(autoId: autoId, fit: BoxFit.cover),
+                    if (isOccupied)
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        child: const Center(
+                          child: Text(
+                            'OCUPADO',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
-            
+
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -299,30 +469,88 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '$brand $model',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF263238),
+                      Expanded(
+                        child: Text(
+                          '$brand $model',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF263238),
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Text(
-                        '\$$actualPrice / día',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1565C0),
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '\$${actualPrice.toStringAsFixed(2)} / km',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1565C0),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
+                  if (distance != null && distance >= 0 && municipio != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          color: Color(0xFFE53935),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'A ${distance.toStringAsFixed(1)} km de ti ($municipio)',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF546E7A),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (_fetchingOwners.contains(ownerId)) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFFE53935),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Calculando distancia...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.blue[50],
                           borderRadius: BorderRadius.circular(8),
@@ -338,13 +566,16 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.grey[100],
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          data['transmission'] ?? 'Estándar', 
+                          data['transmission'] ?? 'Estándar',
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -359,30 +590,12 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
     );
   }
 
-  // Helper para obtener imagen (usado también en Home/ProductScreen)
-  Future<String?> _getCarImageUrl(String autoId) async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('autos')
-          .doc(autoId)
-          .collection('documentos')
-          .doc('documentos_info')
-          .get();
-
-      if (doc.exists && doc.data() != null) {
-        final docs = doc.data()!['documents'] as Map<String, dynamic>;
-        // Ajusta la clave según como la guardes en Storage
-        return docs['Fotos del vehículo'] as String?;
-      }
-    } catch (_) {}
-    return null;
-  }
-
   void _showFilterModal(BuildContext context) {
     RangeValues tempRange = _priceRange;
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -390,62 +603,83 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Filtros',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('Rango de Precio (por día)'),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('\$${tempRange.start.round()} MXN', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text('\$${tempRange.end.round()} MXN', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  RangeSlider(
-                    values: tempRange,
-                    min: 0,
-                    max: 5000,
-                    divisions: 50,
-                    activeColor: const Color(0xFF1565C0),
-                    labels: RangeLabels(
-                      '\$${tempRange.start.round()}',
-                      '\$${tempRange.end.round()}',
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Filtros',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
-                    onChanged: (RangeValues values) {
-                      setModalState(() {
-                        tempRange = values;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _priceRange = tempRange;
+                    const SizedBox(height: 20),
+
+                    // --- FILTRO PRECIO POR KM ---
+                    const Text(
+                      'Rango de Precio Máximo (por km)',
+                      style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF455A64)),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '\$${tempRange.start.round()} MXN',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '\$${tempRange.end.round()} MXN',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    RangeSlider(
+                      values: tempRange,
+                      min: 0,
+                      max: 30, // Precio de hasta 30 pesos por km
+                      divisions: 30,
+                      activeColor: const Color(0xFF1565C0),
+                      labels: RangeLabels(
+                        '\$${tempRange.start.round()}',
+                        '\$${tempRange.end.round()}',
+                      ),
+                      onChanged: (RangeValues values) {
+                        setModalState(() {
+                          tempRange = values;
                         });
-                        Navigator.pop(context);
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1565C0),
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _priceRange = tempRange;
+                          });
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1565C0),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Aplicar filtros',
+                          style: TextStyle(color: Colors.white),
                         ),
                       ),
-                      child: const Text('Aplicar filtros', style: TextStyle(color: Colors.white)),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },

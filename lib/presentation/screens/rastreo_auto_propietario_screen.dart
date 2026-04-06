@@ -13,10 +13,12 @@ class RastreoAutoPropietarioScreen extends StatefulWidget {
   });
 
   @override
-  State<RastreoAutoPropietarioScreen> createState() => _RastreoAutoPropietarioScreenState();
+  State<RastreoAutoPropietarioScreen> createState() =>
+      _RastreoAutoPropietarioScreenState();
 }
 
-class _RastreoAutoPropietarioScreenState extends State<RastreoAutoPropietarioScreen> {
+class _RastreoAutoPropietarioScreenState
+    extends State<RastreoAutoPropietarioScreen> {
   GoogleMapController? _mapController;
 
   @override
@@ -30,7 +32,10 @@ class _RastreoAutoPropietarioScreenState extends State<RastreoAutoPropietarioScr
       ),
       body: StreamBuilder<DocumentSnapshot>(
         // 1. Nos suscribimos al documento específico de la renta en tiempo real
-        stream: FirebaseFirestore.instance.collection('rentals').doc(widget.rentalId).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('rentals')
+            .doc(widget.rentalId)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -41,7 +46,12 @@ class _RastreoAutoPropietarioScreenState extends State<RastreoAutoPropietarioScr
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
-          
+
+          // Extraer precio por KM y distancia guardada (si existe)
+          final double pricePerKm = (data['pricePerKm'] ?? data['price'] ?? 0).toDouble();
+          final double distancia = (data['distanciaRecorridaKm'] ?? 0).toDouble();
+          final double gananciaAcumulada = distancia * pricePerKm;
+
           // 2. Leemos la ubicación actual subida por el arrendatario
           final GeoPoint? location = data['currentLocation'];
 
@@ -52,17 +62,25 @@ class _RastreoAutoPropietarioScreenState extends State<RastreoAutoPropietarioScr
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.location_searching, size: 80, color: Colors.grey[400]),
+                    Icon(
+                      Icons.location_searching,
+                      size: 80,
+                      color: Colors.grey[400],
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Esperando conexión GPS del arrendatario...',
-                      style: TextStyle(color: Colors.grey[700], fontSize: 16, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
                       'El mapa aparecerá cuando inicie su viaje.',
                       style: TextStyle(color: Colors.grey),
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -92,14 +110,19 @@ class _RastreoAutoPropietarioScreenState extends State<RastreoAutoPropietarioScr
                     markerId: const MarkerId('car_location'),
                     position: position,
                     // Icono color azul, podemos usar un Asset de un coche luego si quieres
-                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-                    infoWindow: const InfoWindow(title: 'Ubicación del vehículo'),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueBlue,
+                    ),
+                    infoWindow: const InfoWindow(
+                      title: 'Ubicación del vehículo',
+                    ),
                   ),
                 },
                 mapToolbarEnabled: false,
-                zoomControlsEnabled: false, // Usaremos nuestros botones personalizados
+                zoomControlsEnabled:
+                    false, // Usaremos nuestros botones personalizados
               ),
-              
+
               // Tarjeta superior flotante de estado
               Positioned(
                 top: 16,
@@ -107,19 +130,82 @@ class _RastreoAutoPropietarioScreenState extends State<RastreoAutoPropietarioScr
                 right: 16,
                 child: Card(
                   elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.satellite_alt_rounded, color: Colors.green),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Señal GPS Activa en Tiempo Real',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
-                          ),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.satellite_alt_rounded,
+                              color: Colors.green,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Señal GPS Activa en Tiempo Real',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
+                        if (distancia > 0) ...[
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Distancia recorrida',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${distancia.toStringAsFixed(2)} km',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF263238),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'Ganancia / Cobro',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    '\$${gananciaAcumulada.toStringAsFixed(2)} MXN',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1565C0),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -138,7 +224,9 @@ class _RastreoAutoPropietarioScreenState extends State<RastreoAutoPropietarioScr
                       borderRadius: BorderRadius.circular(8),
                       color: Colors.white,
                       child: InkWell(
-                        onTap: () => _mapController?.animateCamera(CameraUpdate.zoomIn()),
+                        onTap: () => _mapController?.animateCamera(
+                          CameraUpdate.zoomIn(),
+                        ),
                         borderRadius: BorderRadius.circular(8),
                         child: const Padding(
                           padding: EdgeInsets.all(8.0),
@@ -152,7 +240,9 @@ class _RastreoAutoPropietarioScreenState extends State<RastreoAutoPropietarioScr
                       borderRadius: BorderRadius.circular(8),
                       color: Colors.white,
                       child: InkWell(
-                        onTap: () => _mapController?.animateCamera(CameraUpdate.zoomOut()),
+                        onTap: () => _mapController?.animateCamera(
+                          CameraUpdate.zoomOut(),
+                        ),
                         borderRadius: BorderRadius.circular(8),
                         child: const Padding(
                           padding: EdgeInsets.all(8.0),

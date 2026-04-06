@@ -159,7 +159,7 @@ class ProductCarScreen extends StatelessWidget {
               color: Color(0xFF1565C0),
               fontWeight: FontWeight.bold,
             ),
-          ),  
+          ),
         ),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
@@ -283,9 +283,20 @@ class ProductCarScreen extends StatelessWidget {
                   _buildInfoRow(Icons.settings, 'Transmisión', transmission),
                   const Divider(height: 24),
                   _buildInfoRow(Icons.confirmation_number, 'Placas', plate),
-                  if (carData['pricePerDay'] != null) ...[
+                  if (carData['pricePerKm'] != null) ...[
                     const Divider(height: 24),
-                    _buildInfoRow(Icons.attach_money, 'Precio por día', '\$${carData['pricePerDay']} MXN'),
+                    _buildInfoRow(
+                      Icons.attach_money,
+                      'Precio por km',
+                      '\$${carData['pricePerKm']} MXN',
+                    ),
+                  ] else if (carData['pricePerDay'] != null) ...[
+                    const Divider(height: 24),
+                    _buildInfoRow(
+                      Icons.attach_money,
+                      'Precio por km (Legado)',
+                      '\$${carData['pricePerDay']} MXN',
+                    ),
                   ],
                 ],
               ),
@@ -342,8 +353,11 @@ class ProductCarScreen extends StatelessWidget {
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.directions_car_outlined,
-                      size: 64, color: Colors.grey[400]),
+                  Icon(
+                    Icons.directions_car_outlined,
+                    size: 64,
+                    color: Colors.grey[400],
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'Sin imagen disponible',

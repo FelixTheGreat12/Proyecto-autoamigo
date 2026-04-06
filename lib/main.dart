@@ -10,7 +10,6 @@ import 'presentation/screens/mis_autos_screen.dart';
 import 'presentation/screens/mis_rentas_screen.dart';
 import 'presentation/screens/solicitudes_renta_screen.dart';
 import 'presentation/screens/cotizar_auto_screen.dart';
-import 'presentation/screens/documentos_requeridos_screen.dart';
 import 'presentation/screens/perfil_screen.dart';
 import 'presentation/screens/subir_documentos_usuario_screen.dart';
 // import 'presentation/screens/product_car_screen.dart';

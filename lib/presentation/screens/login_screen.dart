@@ -94,7 +94,8 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Form(
             key: _resetFormKey, // Usar la clave del formulario del diálogo
             child: Column(
-              mainAxisSize: MainAxisSize.min, // Para que el diálogo no se expanda
+              mainAxisSize:
+                  MainAxisSize.min, // Para que el diálogo no se expanda
               children: [
                 Text(
                   "Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.",
@@ -137,22 +138,23 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Validar solo el formulario del diálogo
                 if (_resetFormKey.currentState!.validate()) {
                   final email = _resetEmailController.text.trim();
-                  
+
                   try {
                     // Llamar a nuestro servicio
                     await _authService.sendPasswordResetEmail(email);
 
                     if (!mounted) return;
                     Navigator.of(context).pop(); // Cerrar el diálogo
-                    
+
                     // Mostrar mensaje de éxito
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text("Enlace de recuperación enviado a $email"),
+                        content: Text(
+                          "Enlace de recuperación enviado a $email",
+                        ),
                         backgroundColor: Colors.green,
                       ),
                     );
-
                   } catch (e) {
                     if (!mounted) return;
                     Navigator.of(context).pop(); // Cerrar el diálogo
@@ -160,7 +162,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Mostrar mensaje de error (ej. usuario no encontrado)
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text("Error: No se encontró un usuario con ese correo."),
+                        content: Text(
+                          "Error: No se encontró un usuario con ese correo.",
+                        ),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -178,7 +182,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false, // Mantiene la pantalla fija, sin scroll al abrir teclado
+      resizeToAvoidBottomInset:
+          false, // Mantiene la pantalla fija, sin scroll al abrir teclado
       backgroundColor: const Color(0xFFF5F5F5),
       body: Center(
         child: Padding(
@@ -220,10 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(height: 5),
                 Text(
                   "Tu compañero en el camino",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 SizedBox(height: 20),
 
@@ -252,7 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       SizedBox(height: 15),
-                      
+
                       // Campo Email
                       TextFormField(
                         controller: _emailController,
@@ -260,7 +262,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           labelText: 'Correo Electrónico',
-                          prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[600]),
+                          prefixIcon: Icon(
+                            Icons.email_outlined,
+                            color: Colors.grey[600],
+                          ),
                           filled: true,
                           fillColor: Colors.grey[50],
                           border: OutlineInputBorder(
@@ -273,21 +278,26 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: const Color(0xFF0D47A1), width: 1.5),
+                            borderSide: BorderSide(
+                              color: const Color(0xFF0D47A1),
+                              width: 1.5,
+                            ),
                           ),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Por favor, ingresa tu correo.';
                           }
-                          final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                          final emailRegex = RegExp(
+                            r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                          );
                           if (!emailRegex.hasMatch(value.trim())) {
                             return 'Por favor, ingresa un correo válido.';
                           }
                           return null;
                         },
                       ),
-                      
+
                       SizedBox(height: 15),
 
                       // Campo Password
@@ -297,7 +307,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         obscureText: true,
                         decoration: InputDecoration(
                           labelText: 'Contraseña',
-                          prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
+                          prefixIcon: Icon(
+                            Icons.lock_outline,
+                            color: Colors.grey[600],
+                          ),
                           filled: true,
                           fillColor: Colors.grey[50],
                           border: OutlineInputBorder(
@@ -310,7 +323,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: const Color(0xFF0D47A1), width: 1.5),
+                            borderSide: BorderSide(
+                              color: const Color(0xFF0D47A1),
+                              width: 1.5,
+                            ),
                           ),
                         ),
                         validator: (value) {

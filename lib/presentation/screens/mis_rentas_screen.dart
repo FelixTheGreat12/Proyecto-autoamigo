@@ -40,12 +40,14 @@ class MisRentasScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-             // Handle "FAILED_PRECONDITION" (missing index) gracefully-ish
-             // Usually developer needs to click the link in logs.
-             if(snapshot.error.toString().contains('failed-precondition')) {
-               return const Center(child: Text('Falta índice en Firestore. Revisa la consola.'));
-             }
-             return Center(child: Text('Error: ${snapshot.error}'));
+            // Handle "FAILED_PRECONDITION" (missing index) gracefully-ish
+            // Usually developer needs to click the link in logs.
+            if (snapshot.error.toString().contains('failed-precondition')) {
+              return const Center(
+                child: Text('Falta índice en Firestore. Revisa la consola.'),
+              );
+            }
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -96,15 +98,15 @@ class MisRentasScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final rental = rentas[index].data() as Map<String, dynamic>;
               final rentalId = rentas[index].id;
-              
+
               final carBrand = rental['carBrand'] ?? 'Auto';
               final carModel = rental['carModel'] ?? '';
               final status = rental['status'] ?? 'pending';
               final ownerId = rental['ownerId'] ?? '';
-              final price = rental['pricePerDay'] ?? 0;
+              final price = rental['pricePerKm'] ?? rental['pricePerDay'] ?? 0;
               final timestamp = rental['createdAt'] as Timestamp?;
-              final dateStr = timestamp != null 
-                  ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}" 
+              final dateStr = timestamp != null
+                  ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
                   : "Fecha desc.";
 
               return GestureDetector(
@@ -123,58 +125,67 @@ class MisRentasScreen extends StatelessWidget {
                 child: Card(
                   elevation: 2,
                   margin: const EdgeInsets.only(bottom: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Row(
                       children: [
-                      // Icono o Imagen pequeña (Placeholder por simplicidad si no guardamos URL)
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(12),
+                        // Icono o Imagen pequeña (Placeholder por simplicidad si no guardamos URL)
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.directions_car,
+                            color: Colors.blue[800],
+                            size: 30,
+                          ),
                         ),
-                        child: Icon(Icons.directions_car, color: Colors.blue[800], size: 30),
-                      ),
-                      const SizedBox(width: 16),
-                      // Info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$carBrand $carModel',
-                              style: const TextStyle(
-                                fontSize: 16, 
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF263238),
+                        const SizedBox(width: 16),
+                        // Info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$carBrand $carModel',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF263238),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                             Text(
-                              '\$$price MXN / día',
-                              style: const TextStyle(
-                                fontSize: 14, 
-                                color: Color(0xFF1565C0),
-                                fontWeight: FontWeight.w500,
+                              const SizedBox(height: 4),
+                              Text(
+                                '\$$price MXN / día',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF1565C0),
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Solicitado: $dateStr',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              Text(
+                                'Solicitado: $dateStr',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      // Status Badge
-                      _buildStatusBadge(status),
-                    ],
+                        // Status Badge
+                        _buildStatusBadge(status),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               );
             },
           );

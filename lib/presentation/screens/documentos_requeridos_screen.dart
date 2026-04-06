@@ -9,11 +9,7 @@ class DocumentosRequeridosScreen extends StatefulWidget {
   final String? autoId;
   final Map<String, dynamic>? tempAutoData;
 
-  const DocumentosRequeridosScreen({
-    super.key,
-    this.autoId,
-    this.tempAutoData,
-  });
+  const DocumentosRequeridosScreen({super.key, this.autoId, this.tempAutoData});
 
   @override
   State<DocumentosRequeridosScreen> createState() =>
@@ -360,7 +356,7 @@ class _DocumentosRequeridosScreenState
     for (var key in _uploadedUrls.keys) {
       bool hasFile = _selectedFiles[key] != null;
       bool hasUrl = _uploadedUrls[key] != null && _uploadedUrls[key] != '';
-      
+
       if (!hasFile && !hasUrl) {
         missingDocs.add(key);
       }
@@ -387,7 +383,7 @@ class _DocumentosRequeridosScreenState
                     TextButton(
                       onPressed: () => Navigator.pop(context),
                       child: const Text('Entendido'),
-                    )
+                    ),
                   ],
                 ),
               );
@@ -410,7 +406,7 @@ class _DocumentosRequeridosScreenState
         if (widget.tempAutoData == null) {
           throw Exception('No hay datos del auto para guardar');
         }
-        
+
         // Asegurar status y fecha
         final dataToSave = Map<String, dynamic>.from(widget.tempAutoData!);
         dataToSave['createdAt'] = FieldValue.serverTimestamp();

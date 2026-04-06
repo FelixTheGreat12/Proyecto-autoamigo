@@ -9,7 +9,10 @@ class SolicitudesRentaScreen extends StatelessWidget {
   // Función para obtener el nombre del inquilino
   Future<String> _getTenantName(String tenantId) async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(tenantId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(tenantId)
+          .get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
         // Intenta obtener nombre y apellido, o firstName/lastName, o name
@@ -24,7 +27,7 @@ class SolicitudesRentaScreen extends StatelessWidget {
         // Fallbacks antiguos por si acaso
         String nombre = data['nombre'] ?? data['firstName'] ?? '';
         String apellido = data['apellido'] ?? data['lastName'] ?? '';
-        
+
         if (nombre.isNotEmpty) {
           return '$nombre $apellido'.trim();
         }
@@ -37,25 +40,38 @@ class SolicitudesRentaScreen extends StatelessWidget {
   }
 
   // Actualizar estado de la solicitud
-  Future<void> _updateStatus(BuildContext context, String rentalId, String newStatus) async {
+  Future<void> _updateStatus(
+    BuildContext context,
+    String rentalId,
+    String newStatus,
+  ) async {
     try {
       await FirebaseFirestore.instance
           .collection('rentals')
           .doc(rentalId)
           .update({'status': newStatus});
-          
-      if(context.mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(
-             content: Text(newStatus == 'approved' ? 'Solicitud aceptada' : 'Solicitud rechazada'),
-             backgroundColor: newStatus == 'approved' ? Colors.green : Colors.red,
-           )
-         );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              newStatus == 'approved'
+                  ? 'Solicitud aceptada'
+                  : 'Solicitud rechazada',
+            ),
+            backgroundColor: newStatus == 'approved'
+                ? Colors.green
+                : Colors.red,
+          ),
+        );
       }
     } catch (e) {
-      if(context.mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error al actualizar: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -77,7 +93,10 @@ class SolicitudesRentaScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'Solicitudes de Renta',
-          style: TextStyle(color: Color(0xFF1565C0), fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color(0xFF1565C0),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -91,10 +110,14 @@ class SolicitudesRentaScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-             if(snapshot.error.toString().contains('failed-precondition')) {
-               return const Center(child: Text('Falta índice. Revisa la consola y crea el índice compuesto.'));
-             }
-             return Center(child: Text('Error: ${snapshot.error}'));
+            if (snapshot.error.toString().contains('failed-precondition')) {
+              return const Center(
+                child: Text(
+                  'Falta índice. Revisa la consola y crea el índice compuesto.',
+                ),
+              );
+            }
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -125,21 +148,23 @@ class SolicitudesRentaScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final rentalId = docs[index].id;
               final data = docs[index].data() as Map<String, dynamic>;
-              
+
               final tenantId = data['tenantId'] ?? '';
               final carBrand = data['carBrand'] ?? '';
               final carModel = data['carModel'] ?? '';
               final status = data['status'] ?? 'pending';
-              final price = data['pricePerDay'] ?? 0;
+              final price = data['pricePerKm'] ?? data['pricePerDay'] ?? 0;
               final timestamp = data['createdAt'] as Timestamp?;
-              final dateStr = timestamp != null 
-                  ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}" 
+              final dateStr = timestamp != null
+                  ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
                   : "Fecha desconocida";
 
               return Card(
                 clipBehavior: Clip.antiAlias,
                 margin: const EdgeInsets.only(bottom: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 elevation: 2,
                 child: InkWell(
                   onTap: () {
@@ -157,86 +182,107 @@ class SolicitudesRentaScreen extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          FutureBuilder<String>(
-                            future: _getTenantName(tenantId),
-                            builder: (context, snapshot) {
-                              final name = snapshot.data ?? 'Cargando...';
-                              final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-                              
-                              return CircleAvatar(
-                                backgroundColor: Colors.blue[100],
-                                child: Text(
-                                  initial,
-                                  style: TextStyle(color: Colors.blue[800], fontWeight: FontWeight.bold),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                FutureBuilder<String>(
-                                  future: _getTenantName(tenantId),
-                                  builder: (context, snapshot) {
-                                    return Text(
-                                      snapshot.data ?? 'Cargando usuario...',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    );
-                                  }
-                                ),
-                                Text(
-                                  'Interesado en: $carBrand $carModel',
-                                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          ),
-                          _buildStatusBadge(status),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // Detalles
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[200]!)
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Row(
-                               children: [
-                                 Icon(Icons.calendar_today, size: 16, color: Colors.blue[700]),
-                                 const SizedBox(width: 6),
-                                 Text('Solicitado: $dateStr', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                               ],
+                            FutureBuilder<String>(
+                              future: _getTenantName(tenantId),
+                              builder: (context, snapshot) {
+                                final name = snapshot.data ?? 'Cargando...';
+                                final initial = name.isNotEmpty
+                                    ? name[0].toUpperCase()
+                                    : '?';
+
+                                return CircleAvatar(
+                                  backgroundColor: Colors.blue[100],
+                                  child: Text(
+                                    initial,
+                                    style: TextStyle(
+                                      color: Colors.blue[800],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                            Text(
-                              '\$$price',
-                               style: const TextStyle(
-                                 fontWeight: FontWeight.bold,
-                                 color: Color(0xFF1565C0),
-                                 fontSize: 15
-                               ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  FutureBuilder<String>(
+                                    future: _getTenantName(tenantId),
+                                    builder: (context, snapshot) {
+                                      return Text(
+                                        snapshot.data ?? 'Cargando usuario...',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  Text(
+                                    'Interesado en: $carBrand $carModel',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                            _buildStatusBadge(status),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 16),
 
-                      // Botones eliminados por solicitud
-                    ],
+                        // Detalles
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.calendar_today,
+                                    size: 16,
+                                    color: Colors.blue[700],
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Solicitado: $dateStr',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '\$$price',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1565C0),
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Botones eliminados por solicitud
+                      ],
+                    ),
                   ),
                 ),
-              ),
               );
             },
           );
@@ -257,7 +303,7 @@ class SolicitudesRentaScreen extends StatelessWidget {
         label = 'Aprobada';
         break;
       case 'rejected':
-         bg = Colors.red[100]!;
+        bg = Colors.red[100]!;
         text = Colors.red[800]!;
         label = 'Rechazada';
         break;

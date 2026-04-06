@@ -6,15 +6,14 @@ import '../widgets/car_image_loader.dart';
 class RentarAutoScreen extends StatelessWidget {
   final String autoId;
   final Map<String, dynamic> carData;
-  final int price;
+  final double pricePerKm;
 
   const RentarAutoScreen({
     super.key,
     required this.autoId,
     required this.carData,
-    required this.price,
+    required this.pricePerKm,
   });
-
 
   // Obtiene datos del dueño
   Future<Map<String, dynamic>?> _getOwnerData() async {
@@ -26,7 +25,7 @@ class RentarAutoScreen extends StatelessWidget {
           .collection('users')
           .doc(ownerId)
           .get();
-      
+
       return doc.data();
     } catch (e) {
       debugPrint('Error getting owner data: $e');
@@ -34,7 +33,13 @@ class RentarAutoScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _solicitarRenta(BuildContext context, DateTime startDate, DateTime endDate, double total) async {
+  Future<void> _solicitarRenta(
+    BuildContext context,
+    DateTime startDate,
+    DateTime endDate,
+    double total,
+    String paymentMethod,
+  ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -58,8 +63,9 @@ class RentarAutoScreen extends StatelessWidget {
         'ownerId': carData['userId'],
         'status': 'pending', // pending, approved, rejected, completed
         'createdAt': FieldValue.serverTimestamp(),
-        'pricePerDay': price,
-        'totalPrice': total,
+        'pricePerKm': pricePerKm,
+        'estimatedTotal': total,
+        'paymentMethod': paymentMethod,
         'startDate': startDate.toIso8601String(),
         'endDate': endDate.toIso8601String(),
         'carBrand': carData['brand'],
@@ -70,7 +76,7 @@ class RentarAutoScreen extends StatelessWidget {
 
       if (context.mounted) {
         Navigator.pop(context); // Cerrar loading
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Solicitud de renta enviada con éxito'),
@@ -78,7 +84,7 @@ class RentarAutoScreen extends StatelessWidget {
             duration: Duration(seconds: 5),
           ),
         );
-        
+
         // Regresar al Home
         Navigator.pop(context);
         Navigator.pop(context); // Cerrar el bottomsheet de checkout
@@ -86,7 +92,7 @@ class RentarAutoScreen extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context); // Cerrar loading si falla
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al solicitar renta: $e'),
@@ -155,203 +161,450 @@ class RentarAutoScreen extends StatelessWidget {
 
     if (picked == null) return; // El usuario canceló la selección de fechas
 
-    // 2. Calcular días y costos
-    final int days = picked.end.difference(picked.start).inDays + 1; // +1 si rentar hoy y devolver hoy es 1 día
-    final double subtotal = (price * days).toDouble();
-    final double serviceFee = subtotal * 0.10; // 10% de tarifa de servicio
-    final double total = subtotal + serviceFee;
-    
+    // 2. Calcular días iniciales
+    final int days =
+        picked.end.difference(picked.start).inDays +
+        1; // +1 si rentar hoy y devolver hoy es 1 día
+
+    // Valor inicial del slider
+    double kmEstimados = (50 * days).toDouble();
+    final TextEditingController kmController = TextEditingController(
+      text: kmEstimados.toInt().toString(),
+    );
+
+    // Método de pago por defecto
+    String metodoPago = 'Efectivo';
+
     // Función auxiliar para meses
     String obtenerMes(int mes) {
-      const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const meses = [
+        'Ene',
+        'Feb',
+        'Mar',
+        'Abr',
+        'May',
+        'Jun',
+        'Jul',
+        'Ago',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dic',
+      ];
       return meses[mes - 1];
     }
 
     // 3. Mostrar BottomSheet interactivo como Checkout
     if (!context.mounted) return;
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (bottomSheetContext) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(32),
-              topRight: Radius.circular(32),
-            ),
-          ),
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 16,
-            bottom: MediaQuery.of(bottomSheetContext).padding.bottom + 24, // Área segura inferior
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Manija superior
-              Center(
-                child: Container(
-                  width: 50,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            // Recálculo dinámico basado en el control del slider
+            final double estimatedMileageCost = pricePerKm * kmEstimados;
+            final double comisionAutoAmigo =
+                estimatedMileageCost * 0.20; // 20% de comisión
+            final double totalEstimated =
+                estimatedMileageCost + comisionAutoAmigo;
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(32),
+                  topRight: Radius.circular(32),
                 ),
               ),
-              const SizedBox(height: 20),
-              
-              // Título y Cerrar
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Confirma tu renta',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF263238),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(bottomSheetContext),
-                    icon: Icon(Icons.close, color: Colors.grey[600]),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 16,
+                bottom:
+                    MediaQuery.of(bottomSheetContext).padding.bottom +
+                    MediaQuery.of(bottomSheetContext).viewInsets.bottom +
+                    24, // Área segura inferior y teclado
               ),
-              const SizedBox(height: 24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Manija superior
+                    Center(
+                      child: Container(
+                        width: 50,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
-              // Fechas en tarjetas llamativas
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
+                    // Título y Cerrar
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Confirma tu renta',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF263238),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                          icon: Icon(Icons.close, color: Colors.grey[600]),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Fechas en tarjetas llamativas
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.blue[100]!),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      size: 16,
+                                      color: Colors.blue[800],
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'ENTREGA',
+                                      style: TextStyle(
+                                        color: Colors.blue[800],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  '${picked.start.day} ${obtenerMes(picked.start.month)} ${picked.start.year}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(
+                          Icons.arrow_forward,
+                          color: Colors.grey,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.blue[100]!),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.event_available,
+                                      size: 16,
+                                      color: Colors.blue[800],
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'DEVOLUCIÓN',
+                                      style: TextStyle(
+                                        color: Colors.blue[800],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  '${picked.end.day} ${obtenerMes(picked.end.month)} ${picked.end.year}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Distancia estimada',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF263238),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Ajusta los kilómetros que calculas recorrer para estimar tu pago final.',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: const Color(0xFF1565C0),
+                        thumbColor: const Color(0xFF1565C0),
+                        overlayColor: const Color(
+                          0xFF1565C0,
+                        ).withValues(alpha: 0.2),
+                        valueIndicatorTextStyle: const TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                      child: Slider(
+                        value: kmEstimados.clamp(10.0, (300 * days).toDouble()),
+                        min: 10,
+                        max: (300 * days).toDouble(),
+                        divisions: ((300 * days) / 10).round() > 0
+                            ? ((300 * days) / 10).round()
+                            : 1,
+                        label: '${kmEstimados.toInt()} km',
+                        onChanged: (value) {
+                          setState(() {
+                            kmEstimados = value;
+                            kmController.text = value.toInt().toString();
+                          });
+                        },
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          '~ ',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1565C0),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 80,
+                          child: TextField(
+                            controller: kmController,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1565C0),
+                            ),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                              enabledBorder: UnderlineInputBorder(
+                                borderSide: BorderSide(color: Colors.grey),
+                              ),
+                              focusedBorder: UnderlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Color(0xFF1565C0),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              if (val.isEmpty) return;
+                              final double? parsed = double.tryParse(val);
+                              if (parsed != null) {
+                                setState(() {
+                                  kmEstimados = parsed;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const Text(
+                          ' km',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1565C0),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Desglose de pago',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF263238),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Desglose de precios
+                    _buildPriceRow(
+                      'Estimado por uso (~${kmEstimados.toInt()} km)',
+                      '\$${estimatedMileageCost.toStringAsFixed(2)}',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildPriceRow(
+                      'Comisión por uso (20%)',
+                      '\$${comisionAutoAmigo.toStringAsFixed(2)}',
+                      isFee: true,
+                    ),
+
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Divider(),
+                    ),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Estimado a pagar (MXN)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '\$${totalEstimated.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1565C0),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '* El costo final dependerá de los kilómetros reales recorridos a \$${pricePerKm.toStringAsFixed(2)}/km.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Método de pago',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF263238),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
                       decoration: BoxDecoration(
-                        color: Colors.blue[50],
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.blue[100]!),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Icon(Icons.calendar_today, size: 16, color: Colors.blue[800]),
-                              const SizedBox(width: 8),
-                              Text('ENTREGA', style: TextStyle(color: Colors.blue[800], fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
+                          RadioListTile<String>(
+                            title: const Row(
+                              children: [
+                                Icon(Icons.money, color: Colors.green),
+                                SizedBox(width: 8),
+                                Text('Efectivo'),
+                              ],
+                            ),
+                            value: 'Efectivo',
+                            groupValue: metodoPago,
+                            onChanged: (val) {
+                              if (val != null) setState(() => metodoPago = val);
+                            },
+                            activeColor: const Color(0xFF1565C0),
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            '${picked.start.day} ${obtenerMes(picked.start.month)} ${picked.start.year}',
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                          const Divider(height: 1),
+                          RadioListTile<String>(
+                            title: const Row(
+                              children: [
+                                Icon(Icons.credit_card, color: Colors.blue),
+                                SizedBox(width: 8),
+                                Text('Tarjeta'),
+                              ],
+                            ),
+                            value: 'Tarjeta',
+                            groupValue: metodoPago,
+                            onChanged: (val) {
+                              if (val != null) setState(() => metodoPago = val);
+                            },
+                            activeColor: const Color(0xFF1565C0),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Icon(Icons.arrow_forward, color: Colors.grey, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.blue[100]!),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.event_available, size: 16, color: Colors.blue[800]),
-                              const SizedBox(width: 8),
-                              Text('DEVOLUCIÓN', style: TextStyle(color: Colors.blue[800], fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            '${picked.end.day} ${obtenerMes(picked.end.month)} ${picked.end.year}',
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 24),
-              const Text(
-                'Desglose de pago',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF263238)),
-              ),
-              const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-              // Desglose de precios
-              _buildPriceRow(
-                'Tarifa base (\$$price x $days ${days == 1 ? "día" : "días"})',
-                '\$${subtotal.toStringAsFixed(2)}',
-              ),
-              const SizedBox(height: 12),
-              _buildPriceRow(
-                'Tarifa de servicio',
-                '\$${serviceFee.toStringAsFixed(2)}',
-                isFee: true,
-              ),
-              
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16.0),
-                child: Divider(),
-              ),
-              
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total (MXN)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  Text(
-                    '\$${total.toStringAsFixed(2)}', 
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1565C0))
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 32),
-              
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () => _solicitarRenta(context, picked.start, picked.end, total),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1565C0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: () => _solicitarRenta(
+                          context,
+                          picked.start,
+                          picked.end,
+                          totalEstimated,
+                          metodoPago,
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1565C0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                        ),
+                        child: const Text(
+                          'Confirmar y Solicitar',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
                     ),
-                    elevation: 4,
-                  ),
-                  child: const Text(
-                    'Confirmar y Solicitar',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -380,10 +633,7 @@ class RentarAutoScreen extends StatelessWidget {
                 PageView(
                   children: [
                     // Imagen Real del auto
-                    CarImageLoader(
-                      autoId: autoId,
-                      fit: BoxFit.cover,
-                    ),
+                    CarImageLoader(autoId: autoId, fit: BoxFit.cover),
                     // Imágenes de ejemplo (Vacías por ahora)
                     Container(
                       color: Colors.grey[300],
@@ -391,9 +641,16 @@ class RentarAutoScreen extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.image_not_supported_outlined, size: 48, color: Colors.grey),
+                            Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
                             SizedBox(height: 8),
-                            Text('Vista Interior', style: TextStyle(color: Colors.grey)),
+                            Text(
+                              'Vista Interior',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ],
                         ),
                       ),
@@ -404,9 +661,16 @@ class RentarAutoScreen extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.image_not_supported_outlined, size: 48, color: Colors.grey),
+                            Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
                             SizedBox(height: 8),
-                            Text('Vista Lateral', style: TextStyle(color: Colors.grey)),
+                            Text(
+                              'Vista Lateral',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ],
                         ),
                       ),
@@ -417,9 +681,16 @@ class RentarAutoScreen extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.image_not_supported_outlined, size: 48, color: Colors.grey),
+                            Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
                             SizedBox(height: 8),
-                            Text('Vista Trasera', style: TextStyle(color: Colors.grey)),
+                            Text(
+                              'Vista Trasera',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ],
                         ),
                       ),
@@ -428,10 +699,14 @@ class RentarAutoScreen extends StatelessWidget {
                 ),
                 // Indicador de "Varias fotos"
                 Positioned(
-                  bottom: 40, // Justo encima del contenido blanco que empieza en top:220 (250 - 40 = 210 visualmente)
+                  bottom:
+                      40, // Justo encima del contenido blanco que empieza en top:220 (250 - 40 = 210 visualmente)
                   right: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(12),
@@ -442,7 +717,11 @@ class RentarAutoScreen extends StatelessWidget {
                         SizedBox(width: 4),
                         Text(
                           '1/4', // Estático por ahora
-                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -451,7 +730,7 @@ class RentarAutoScreen extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Gradiente oscuro para que se vean los iconos blancos
           Positioned(
             top: 0,
@@ -520,7 +799,10 @@ class RentarAutoScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.blue[50],
                                   borderRadius: BorderRadius.circular(8),
@@ -541,7 +823,7 @@ class RentarAutoScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              '\$$price',
+                              '\$$pricePerKm',
                               style: const TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
@@ -549,7 +831,7 @@ class RentarAutoScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              'MXN / día',
+                              'MXN / km',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -560,7 +842,7 @@ class RentarAutoScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 24),
                     const Divider(),
                     const SizedBox(height: 24),
@@ -580,13 +862,16 @@ class RentarAutoScreen extends StatelessWidget {
                       builder: (context, snapshot) {
                         final ownerData = snapshot.data;
                         // Corrección: Usar 'fullName' que es como se guarda en el registro
-                        final fullName = ownerData?['fullName'] as String? ?? 'Usuario AutoAmigo';
-                        
+                        final fullName =
+                            ownerData?['fullName'] as String? ??
+                            'Usuario AutoAmigo';
+
                         // Rating simulado para la demo
                         const rating = 4.8;
                         const reviews = 124;
 
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return _buildOwnerSkeleton();
                         }
 
@@ -614,7 +899,9 @@ class RentarAutoScreen extends StatelessWidget {
                                   color: Colors.blue[100],
                                   image: const DecorationImage(
                                     // Placeholder image de perfil
-                                    image: NetworkImage('https://i.pravatar.cc/150?img=11'),
+                                    image: NetworkImage(
+                                      'https://i.pravatar.cc/150?img=11',
+                                    ),
                                     fit: BoxFit.cover,
                                   ),
                                 ),
@@ -626,7 +913,11 @@ class RentarAutoScreen extends StatelessWidget {
                                       color: Colors.white,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.verified, size: 16, color: Colors.blue),
+                                    child: const Icon(
+                                      Icons.verified,
+                                      size: 16,
+                                      color: Colors.blue,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -637,7 +928,9 @@ class RentarAutoScreen extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      fullName.isNotEmpty ? fullName : 'Cargando...',
+                                      fullName.isNotEmpty
+                                          ? fullName
+                                          : 'Cargando...',
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
@@ -647,7 +940,11 @@ class RentarAutoScreen extends StatelessWidget {
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        const Icon(Icons.star, size: 16, color: Colors.amber),
+                                        const Icon(
+                                          Icons.star,
+                                          size: 16,
+                                          color: Colors.amber,
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '$rating',
@@ -690,20 +987,36 @@ class RentarAutoScreen extends StatelessWidget {
                       crossAxisCount: 2,
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      childAspectRatio: 1.0, 
+                      childAspectRatio: 1.0,
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 16,
                       children: [
-                        _buildFeatureCard(Icons.calendar_today, 'Año', year.toString()),
-                        _buildFeatureCard(Icons.speed, 'Transmisión', transmission),
-                        _buildFeatureCard(Icons.palette_outlined, 'Color', color),
-                        _buildFeatureCard(Icons.local_gas_station_outlined, 'Combustible', 'Gasolina'),
+                        _buildFeatureCard(
+                          Icons.calendar_today,
+                          'Año',
+                          year.toString(),
+                        ),
+                        _buildFeatureCard(
+                          Icons.speed,
+                          'Transmisión',
+                          transmission,
+                        ),
+                        _buildFeatureCard(
+                          Icons.palette_outlined,
+                          'Color',
+                          color,
+                        ),
+                        _buildFeatureCard(
+                          Icons.local_gas_station_outlined,
+                          'Combustible',
+                          'Gasolina',
+                        ),
                       ],
                     ),
 
                     const SizedBox(height: 32),
-                    
-                    // DESCRIPCIÓN 
+
+                    // DESCRIPCIÓN
                     const Text(
                       'Descripción del Propietario',
                       style: TextStyle(
@@ -723,7 +1036,6 @@ class RentarAutoScreen extends StatelessWidget {
                     ),
 
                     const SizedBox(height: 32),
-                    
                   ],
                 ),
               ),
@@ -738,18 +1050,24 @@ class RentarAutoScreen extends StatelessWidget {
             child: SizedBox(
               height: 56,
               child: ElevatedButton(
-                onPressed: () => _mostrarCheckoutFront(context),
+                onPressed: carData['status'] == 'ocupado'
+                    ? null // Deshabilitado si está ocupado
+                    : () => _mostrarCheckoutFront(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1565C0),
+                  backgroundColor: carData['status'] == 'ocupado'
+                      ? Colors.grey[400]
+                      : const Color(0xFF1565C0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  elevation: 5,
+                  elevation: carData['status'] == 'ocupado' ? 0 : 5,
                   shadowColor: const Color(0xFF1565C0).withValues(alpha: 0.4),
                 ),
-                child: const Text(
-                  'Solicitar Renta ahora',
-                  style: TextStyle(
+                child: Text(
+                  carData['status'] == 'ocupado'
+                      ? 'Auto Ocupado'
+                      : 'Solicitar Renta ahora',
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -772,7 +1090,14 @@ class RentarAutoScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(width: 60, height: 60, decoration: BoxDecoration(color: Colors.grey[200], shape: BoxShape.circle)),
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              shape: BoxShape.circle,
+            ),
+          ),
           const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -15,7 +15,8 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   final AuthService _authService = AuthService();
   late TabController _tabController;
   int _selectedIndex = 0;
@@ -49,14 +50,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       // ARRENDATARIO: [0: Buscar, 1: Mis Rentas]
       switch (index) {
         case 0: // Buscar
-           Navigator.push(
+          Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const BuscarAutoScreen()),
           );
           break;
         case 1: // Mis Rentas
-           Navigator.pushNamed(context, '/mis_rentas');
-           break;
+          Navigator.pushNamed(context, '/mis_rentas');
+          break;
       }
     } else {
       // ARRENDADOR: [0: Cotizar, 1: Solicitudes]
@@ -65,8 +66,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Navigator.pushNamed(context, '/cotizar_auto');
           break;
         case 1: // Solicitudes
-           Navigator.pushNamed(context, '/solicitudes_renta');
-           break;
+          Navigator.pushNamed(context, '/solicitudes_renta');
+          break;
       }
     }
   }
@@ -79,17 +80,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         .doc('documentos_info')
         .snapshots()
         .map((snapshot) {
-      if (!snapshot.exists) return true;
-      final data = snapshot.data();
-      if (data == null || !data.containsKey('documents')) return true;
+          if (!snapshot.exists) return true;
+          final data = snapshot.data();
+          if (data == null || !data.containsKey('documents')) return true;
 
-      final docs = data['documents'] as Map<String, dynamic>;
-      final hasIne = docs['INE / IFE'] != null && docs['INE / IFE'].toString().isNotEmpty;
-      final hasLicencia = docs['Licencia'] != null && docs['Licencia'].toString().isNotEmpty;
-      final hasComprobante = docs['Comprobante'] != null && docs['Comprobante'].toString().isNotEmpty;
+          final docs = data['documents'] as Map<String, dynamic>;
+          final hasIne =
+              docs['INE / IFE'] != null &&
+              docs['INE / IFE'].toString().isNotEmpty;
+          final hasLicencia =
+              docs['Licencia'] != null &&
+              docs['Licencia'].toString().isNotEmpty;
+          final hasComprobante =
+              docs['Comprobante'] != null &&
+              docs['Comprobante'].toString().isNotEmpty;
 
-      return !(hasIne && hasLicencia && hasComprobante);
-    });
+          return !(hasIne && hasLicencia && hasComprobante);
+        });
   }
 
   Widget _buildMissingDocumentsBanner() {
@@ -99,12 +106,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return StreamBuilder<bool>(
       stream: _checkDocumentsMissing(user.uid),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.hasError) return const SizedBox.shrink();
-        
+        if (!snapshot.hasData || snapshot.hasError)
+          return const SizedBox.shrink();
+
         // Si data es false, significa que NO faltan documentos (todo ok).
         // Si data es true, significa que SÍ faltan documentos.
         final areDocumentsMissing = snapshot.data!;
-        
+
         if (!areDocumentsMissing) return const SizedBox.shrink();
 
         return Container(
@@ -121,9 +129,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               padding: const EdgeInsets.all(12.0),
               child: Column(
                 children: [
-                   Row(
+                  Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.orange[800], size: 30),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange[800],
+                        size: 30,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -142,10 +154,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                         Navigator.push(
+                        Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const SubirDocumentosUsuarioScreen(),
+                            builder: (context) =>
+                                const SubirDocumentosUsuarioScreen(),
                           ),
                         );
                       },
@@ -156,7 +169,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                       child: const Text('Subir Documentos Ahora'),
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -274,38 +287,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           child: BottomNavigationBar(
             items: isArrendatario
-              ? const [
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.search),
-                    label: 'Buscar',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.key),
-                    label: 'Mis Rentas',
-                  ),
-                ]
-              : const [
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.add_circle_outline),
-                    label: 'Cotizar',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.people_alt_outlined),
-                    label: 'Solicitudes',
-                  ),
-                ],
-          currentIndex: _selectedIndex,
-          backgroundColor: Colors.white,
-          elevation: 0,
-          // Mantenemos tu preferencia de no iluminar
-          selectedItemColor: Colors.grey[800],
-          unselectedItemColor: Colors.grey[600],
-          showUnselectedLabels: true,
-          onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-        ),
+                ? const [
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.search),
+                      label: 'Buscar',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.key),
+                      label: 'Mis Rentas',
+                    ),
+                  ]
+                : const [
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.add_circle_outline),
+                      label: 'Cotizar',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.people_alt_outlined),
+                      label: 'Solicitudes',
+                    ),
+                  ],
+            currentIndex: _selectedIndex,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            // Mantenemos tu preferencia de no iluminar
+            selectedItemColor: Colors.grey[800],
+            unselectedItemColor: Colors.grey[600],
+            showUnselectedLabels: true,
+            onTap: _onItemTapped,
+            type: BottomNavigationBarType.fixed,
+            selectedFontSize: 12,
+            unselectedFontSize: 12,
+          ),
         ),
       ),
     );
@@ -334,10 +347,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               Text(
                 'Bienvenido, Arrendatario',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 16),
               ),
               const SizedBox(height: 4),
               const Text(
@@ -356,10 +366,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         // Lista de Autos disponibles
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            // Filtramos solo los autos que ya completaron su registro
+            // Filtramos solo los autos que ya completaron su registro o están ocupados
             stream: FirebaseFirestore.instance
                 .collection('autos')
-                .where('status', isEqualTo: 'registrado')
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
@@ -370,12 +379,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 return const Center(child: CircularProgressIndicator());
               }
 
-              // Filtramos localmente para excluir los autos del propio usuario
+              // Filtramos localmente para excluir los autos del propio usuario y filtrar status
               final currentUserId =
                   AuthService().currentUser?.uid; // Obtener ID actual
 
               final docs = (snapshot.data?.docs ?? []).where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
+                final status = data['status'];
+                // Mostrar solo "registrado" o "ocupado"
+                if (status != 'registrado' && status != 'ocupado') return false;
                 // Si el auto tiene dueño y es el mismo usuario actual, lo ocultamos
                 return data['userId'] != currentUserId;
               }).toList();
@@ -385,8 +397,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.directions_car_outlined,
-                          size: 64, color: Colors.grey),
+                      Icon(
+                        Icons.directions_car_outlined,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
                       SizedBox(height: 16),
                       Text(
                         'No hay autos disponibles por ahora',
@@ -409,25 +424,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   final model = data['model'] ?? 'Modelo desconocido';
                   final year = data['year'] ?? '';
 
-                  // Price from database or fallback if old data
+                  // Price from database (checking new format first)
                   double rawPrice = 0.0;
-                  if (data['pricePerDay'] != null) {
+                  if (data['pricePerKm'] != null) {
+                    rawPrice = (data['pricePerKm'] as num).toDouble();
+                  } else if (data['pricePerDay'] != null) {
                     rawPrice = (data['pricePerDay'] as num).toDouble();
                   } else {
                     final random = Random(autoId.hashCode);
-                    rawPrice = 700.0 + random.nextInt(1500); // Fallback para datos viejos
+                    rawPrice =
+                        4.5 +
+                        (random.nextInt(500) /
+                            100); // Fallback para datos viejos
                   }
-                  final int price = rawPrice.toInt();
+                  final bool isInt = rawPrice == rawPrice.roundToDouble();
+                  final String price = isInt
+                      ? rawPrice.toInt().toString()
+                      : rawPrice.toStringAsFixed(2);
 
                   // Intentamos sacar la URL de la imagen principal si existe en
                   // la subcolección 'documentos'. Como aquí no tenemos fácil acceso
                   // a la subcolección en una sola query, mostraremos un placeholder
                   // y cargaremos la imagen con un FutureBuilder interno si es necesario,
                   // o mejor aún, si guardaste la URL principal en el documento del auto.
-                  
+
                   // NOTA: Para eficiencia, lo ideal sería guardar 'mainImageUrl'
                   // directamente en el documento 'autos/{id}' al subir los docs.
                   // Aquí simularemos con un FutureBuilder simple.
+
+                  final bool isOccupied = data['status'] == 'ocupado';
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -438,14 +463,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
                       onTap: () {
-                        // Navegar a la pantalla de detalles para rentar
+                        // Navegar a la pantalla de detalles para rentar (aunque esté ocupado, permitimos verlo)
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => RentarAutoScreen(
                               autoId: autoId,
                               carData: data,
-                              price: price, // Pasar el precio calculado
+                              pricePerKm:
+                                  rawPrice, // Pasar el precio float directamente
                             ),
                           ),
                         );
@@ -457,21 +483,43 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           SizedBox(
                             height: 180,
                             width: double.infinity,
-                            child: CarImageLoader(
-                              autoId: autoId,
-                              fit: BoxFit.cover,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                CarImageLoader(
+                                  autoId: autoId,
+                                  fit: BoxFit.cover,
+                                ),
+                                if (isOccupied)
+                                  Container(
+                                    color: Colors.black.withValues(alpha: 0.5),
+                                    child: const Center(
+                                      child: Text(
+                                        'OCUPADO',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          
+
                           // Información
                           Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Expanded( // <-- AGREGADO: Evita el overflow
+                                Expanded(
+                                  // <-- AGREGADO: Evita el overflow
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         '$brand $model $year',
@@ -480,15 +528,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                           fontWeight: FontWeight.bold,
                                           color: Color(0xFF263238),
                                         ),
-                                        maxLines: 1, // <-- AGREGADO: Limita a una línea
-                                        overflow: TextOverflow.ellipsis, // <-- AGREGADO: Pone '...'
+                                        maxLines:
+                                            1, // <-- AGREGADO: Limita a una línea
+                                        overflow: TextOverflow
+                                            .ellipsis, // <-- AGREGADO: Pone '...'
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Disponible ahora',
+                                        isOccupied ? 'No disponible' : 'Disponible ahora',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: Colors.green[600],
+                                          color: isOccupied ? Colors.red[600] : Colors.green[600],
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
@@ -507,7 +557,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                       ),
                                     ),
                                     Text(
-                                      'por día',
+                                      'por km',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey[600],
@@ -541,7 +591,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       children: [
         // Banner de aviso de documentos faltantes
         _buildMissingDocumentsBanner(),
-        
+
         // Banner de bienvenida específico por rol
         Container(
           width: double.infinity,
@@ -558,10 +608,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               Text(
                 'Bienvenido, $roleTitle',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 16),
               ),
               const SizedBox(height: 4),
               Text(
@@ -605,7 +652,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       borderRadius: BorderRadius.circular(20.0),
       elevation: 0, // Flat design con sombra suave
       child: InkWell(
-        onTap: onTap ??
+        onTap:
+            onTap ??
             () {
               print('$title presionado');
             },

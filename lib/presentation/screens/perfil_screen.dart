@@ -8,7 +8,10 @@ class PerfilScreen extends StatelessWidget {
   Future<Map<String, dynamic>?> _getUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       return doc.data();
     }
     return null;
@@ -32,7 +35,7 @@ class PerfilScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           final userData = snapshot.data ?? {};
           final name = userData['fullName'] ?? 'Usuario';
           final email = userData['email'] ?? user?.email ?? '';
@@ -57,13 +60,10 @@ class PerfilScreen extends StatelessWidget {
                 ),
                 Text(
                   email,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Menú de opciones
                 _buildMenuOption(
                   context,
@@ -72,7 +72,9 @@ class PerfilScreen extends StatelessWidget {
                   onTap: () {
                     // Pendiente: Editar perfil
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Próximamente: Editar Perfil')),
+                      const SnackBar(
+                        content: Text('Próximamente: Editar Perfil'),
+                      ),
                     );
                   },
                 ),
@@ -95,7 +97,11 @@ class PerfilScreen extends StatelessWidget {
                   onTap: () async {
                     await FirebaseAuth.instance.signOut();
                     if (context.mounted) {
-                      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        '/login',
+                        (route) => false,
+                      );
                     }
                   },
                 ),
@@ -107,7 +113,8 @@ class PerfilScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuOption(BuildContext context, {
+  Widget _buildMenuOption(
+    BuildContext context, {
     required IconData icon,
     required String title,
     String? subtitle,
@@ -127,17 +134,23 @@ class PerfilScreen extends StatelessWidget {
             color: textColor == Colors.red ? Colors.red[50] : Colors.blue[50],
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: textColor == Colors.red ? Colors.red : const Color(0xFF1565C0)),
+          child: Icon(
+            icon,
+            color: textColor == Colors.red
+                ? Colors.red
+                : const Color(0xFF1565C0),
+          ),
         ),
         title: Text(
           title,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: textColor,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
         ),
         subtitle: subtitle != null ? Text(subtitle) : null,
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey,
+        ),
         onTap: onTap,
       ),
     );

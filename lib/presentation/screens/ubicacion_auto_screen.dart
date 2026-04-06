@@ -6,10 +6,7 @@ import 'package:geocoding/geocoding.dart';
 class UbicacionAutoScreen extends StatefulWidget {
   final String address;
 
-  const UbicacionAutoScreen({
-    super.key,
-    required this.address,
-  });
+  const UbicacionAutoScreen({super.key, required this.address});
 
   @override
   State<UbicacionAutoScreen> createState() => _UbicacionAutoScreenState();
@@ -32,7 +29,7 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
     try {
       // Intentar obtener las coordenadas de la dirección
       List<Location> locations = await locationFromAddress(widget.address);
-      
+
       if (locations.isNotEmpty) {
         final loc = locations.first;
         setState(() {
@@ -42,7 +39,9 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
               markerId: const MarkerId('car_location'),
               position: _targetLocation!,
               infoWindow: const InfoWindow(title: 'Punto de entrega'),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueRed,
+              ),
             ),
           );
           _isLoading = false;
@@ -63,9 +62,10 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
   }
 
   Future<void> _launchExternalMap(BuildContext context) async {
-    final urlText = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.address)}';
+    final urlText =
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.address)}';
     final Uri url = Uri.parse(urlText);
-    
+
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -96,98 +96,125 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _targetLocation != null
-                      ? Stack(
-                          children: [
-                            GoogleMap(
-                              initialCameraPosition: CameraPosition(
-                                target: _targetLocation!,
-                                zoom: 16.0, // Zoom suficientemente cerca para ver las calles
-                              ),
-                              markers: _markers,
-                              onMapCreated: (controller) => _mapController = controller,
-                              myLocationEnabled: true,
-                              zoomControlsEnabled: false, // Usaremos nuestros propios botones
-                              mapToolbarEnabled: false,
-                            ),
-                            Positioned(
-                              right: 10,
-                              bottom: 30,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Material(
-                                    elevation: 4,
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: Colors.white,
-                                    child: InkWell(
-                                      onTap: () {
-                                        _mapController?.animateCamera(CameraUpdate.zoomIn());
-                                      },
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(8.0),
-                                        child: Icon(Icons.add, color: Colors.black87),
-                                      ),
+                  ? Stack(
+                      children: [
+                        GoogleMap(
+                          initialCameraPosition: CameraPosition(
+                            target: _targetLocation!,
+                            zoom:
+                                16.0, // Zoom suficientemente cerca para ver las calles
+                          ),
+                          markers: _markers,
+                          onMapCreated: (controller) =>
+                              _mapController = controller,
+                          myLocationEnabled: true,
+                          zoomControlsEnabled:
+                              false, // Usaremos nuestros propios botones
+                          mapToolbarEnabled: false,
+                        ),
+                        Positioned(
+                          right: 10,
+                          bottom: 30,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Material(
+                                elevation: 4,
+                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.white,
+                                child: InkWell(
+                                  onTap: () {
+                                    _mapController?.animateCamera(
+                                      CameraUpdate.zoomIn(),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Icon(
+                                      Icons.add,
+                                      color: Colors.black87,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Material(
-                                    elevation: 4,
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: Colors.white,
-                                    child: InkWell(
-                                      onTap: () {
-                                        _mapController?.animateCamera(CameraUpdate.zoomOut());
-                                      },
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(8.0),
-                                        child: Icon(Icons.remove, color: Colors.black87),
-                                      ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Material(
+                                elevation: 4,
+                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.white,
+                                child: InkWell(
+                                  onTap: () {
+                                    _mapController?.animateCamera(
+                                      CameraUpdate.zoomOut(),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Icon(
+                                      Icons.remove,
+                                      color: Colors.black87,
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ],
-                        )
-                      : Container(
-                          color: Colors.grey[200],
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(20.0),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.location_off, size: 60, color: Colors.grey[500]),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _errorMessage,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: Colors.grey[700], fontSize: 16),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            ],
                           ),
                         ),
+                      ],
+                    )
+                  : Container(
+                      color: Colors.grey[200],
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.location_off,
+                                size: 60,
+                                color: Colors.grey[500],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _errorMessage,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey[700],
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
             ),
           ),
-          
+
           // ---------------------------------------------------------
           // DETALLES DE LA DIRECCIÓN
           // ---------------------------------------------------------
           Container(
-            padding: const EdgeInsets.only(top: 20, left: 20, right: 20, bottom: 30),
+            padding: const EdgeInsets.only(
+              top: 20,
+              left: 20,
+              right: 20,
+              bottom: 30,
+            ),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(30),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.1),
                   blurRadius: 15,
                   offset: const Offset(0, -5),
-                )
+                ),
               ],
             ),
             child: Column(
@@ -203,7 +230,7 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                
+
                 // Tarjeta de dirección
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -220,14 +247,18 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
                           color: Colors.white,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.home_work_outlined, color: Colors.blue[800], size: 24),
+                        child: Icon(
+                          Icons.home_work_outlined,
+                          color: Colors.blue[800],
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           widget.address,
                           style: const TextStyle(
-                            fontSize: 13, 
+                            fontSize: 13,
                             color: Color(0xFF263238),
                             fontWeight: FontWeight.w500,
                           ),
@@ -236,23 +267,33 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Botón de indicaciones paso a paso
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton.icon(
                     onPressed: () => _launchExternalMap(context),
-                    icon: const Icon(Icons.directions, color: Colors.white, size: 20),
+                    icon: const Icon(
+                      Icons.directions,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                     label: const Text(
                       'Conducir hacia ahí',
-                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1565C0),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       elevation: 2,
                     ),
                   ),

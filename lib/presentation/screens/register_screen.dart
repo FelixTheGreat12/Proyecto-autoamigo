@@ -31,7 +31,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Month display names in Spanish, but values remain as '01'..'12'
   final List<String> _monthNumbers = [
-    '01','02','03','04','05','06','07','08','09','10','11','12'
+    '01',
+    '02',
+    '03',
+    '04',
+    '05',
+    '06',
+    '07',
+    '08',
+    '09',
+    '10',
+    '11',
+    '12',
   ];
   final Map<String, String> _monthNames = {
     '01': 'Ene',
@@ -56,35 +67,109 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _selectedMunicipioZac;
 
   final List<String> _estadosMexico = [
-    'Aguascalientes', 'Baja California', 'Baja California Sur', 'Campeche', 
-    'Chiapas', 'Chihuahua', 'Ciudad de México', 'Coahuila', 'Colima', 
-    'Durango', 'Estado de México', 'Guanajuato', 'Guerrero', 'Hidalgo', 
-    'Jalisco', 'Michoacán', 'Morelos', 'Nayarit', 'Nuevo León', 'Oaxaca', 
-    'Puebla', 'Querétaro', 'Quintana Roo', 'San Luis Potosí', 'Sinaloa', 
-    'Sonora', 'Tabasco', 'Tamaulipas', 'Tlaxcala', 'Veracruz', 'Yucatán', 
-    'Zacatecas'
+    'Aguascalientes',
+    'Baja California',
+    'Baja California Sur',
+    'Campeche',
+    'Chiapas',
+    'Chihuahua',
+    'Ciudad de México',
+    'Coahuila',
+    'Colima',
+    'Durango',
+    'Estado de México',
+    'Guanajuato',
+    'Guerrero',
+    'Hidalgo',
+    'Jalisco',
+    'Michoacán',
+    'Morelos',
+    'Nayarit',
+    'Nuevo León',
+    'Oaxaca',
+    'Puebla',
+    'Querétaro',
+    'Quintana Roo',
+    'San Luis Potosí',
+    'Sinaloa',
+    'Sonora',
+    'Tabasco',
+    'Tamaulipas',
+    'Tlaxcala',
+    'Veracruz',
+    'Yucatán',
+    'Zacatecas',
   ];
 
   final List<String> _municipiosZacatecas = [
-    'Apozol', 'Apulco', 'Atolinga', 'Benito Juárez', 'Calera', 
-    'Cañitas de Felipe Pescador', 'Concepción del Oro', 'Cuauhtémoc', 'Chalchihuites', 
-    'El Plateado de Joaquín Amaro', 'El Salvador', 'Fresnillo', 'Genaro Codina', 
-    'General Enrique Estrada', 'General Francisco R. Murguía', 'General Pánfilo Natera', 
-    'Guadalupe', 'Huanusco', 'Jalpa', 'Jerez', 'Jiménez del Teul', 'Juan Aldama', 
-    'Juchipila', 'Loreto', 'Luis Moya', 'Mazapil', 'Melchor Ocampo', 'Mezquital del Oro', 
-    'Miguel Auza', 'Momax', 'Monte Escobedo', 'Morelos', 'Moyahua de Estrada', 
-    'Nochistlán de Mejía', 'Noria de Ángeles', 'Ojocaliente', 'Pánuco', 'Pinos', 
-    'Río Grande', 'Sain Alto', 'Santa María de la Paz', 'Sombrerete', 'Susticacán', 
-    'Tabasco', 'Tepechitlán', 'Tepetongo', 'Teúl de González Ortega', 
-    'Tlaltenango de Sánchez Román', 'Trancoso', 'Trinidad García de la Cadena', 
-    'Valparaíso', 'Vetagrande', 'Villa de Cos', 'Villa García', 'Villa González Ortega', 
-    'Villa Hidalgo', 'Villa Nueva', 'Zacatecas'
+    'Apozol',
+    'Apulco',
+    'Atolinga',
+    'Benito Juárez',
+    'Calera',
+    'Cañitas de Felipe Pescador',
+    'Concepción del Oro',
+    'Cuauhtémoc',
+    'Chalchihuites',
+    'El Plateado de Joaquín Amaro',
+    'El Salvador',
+    'Fresnillo',
+    'Genaro Codina',
+    'General Enrique Estrada',
+    'General Francisco R. Murguía',
+    'General Pánfilo Natera',
+    'Guadalupe',
+    'Huanusco',
+    'Jalpa',
+    'Jerez',
+    'Jiménez del Teul',
+    'Juan Aldama',
+    'Juchipila',
+    'Loreto',
+    'Luis Moya',
+    'Mazapil',
+    'Melchor Ocampo',
+    'Mezquital del Oro',
+    'Miguel Auza',
+    'Momax',
+    'Monte Escobedo',
+    'Morelos',
+    'Moyahua de Estrada',
+    'Nochistlán de Mejía',
+    'Noria de Ángeles',
+    'Ojocaliente',
+    'Pánuco',
+    'Pinos',
+    'Río Grande',
+    'Sain Alto',
+    'Santa María de la Paz',
+    'Sombrerete',
+    'Susticacán',
+    'Tabasco',
+    'Tepechitlán',
+    'Tepetongo',
+    'Teúl de González Ortega',
+    'Tlaltenango de Sánchez Román',
+    'Trancoso',
+    'Trinidad García de la Cadena',
+    'Valparaíso',
+    'Vetagrande',
+    'Villa de Cos',
+    'Villa García',
+    'Villa González Ortega',
+    'Villa Hidalgo',
+    'Villa Nueva',
+    'Zacatecas',
   ];
 
   List<String> get _computedDays {
     // Compute days based on selected month and year. If year not selected, use current year.
-    final year = _selectedYear != null ? int.tryParse(_selectedYear!) ?? DateTime.now().year : DateTime.now().year;
-    final month = _selectedMonth != null ? int.tryParse(_selectedMonth!) ?? 1 : 1;
+    final year = _selectedYear != null
+        ? int.tryParse(_selectedYear!) ?? DateTime.now().year
+        : DateTime.now().year;
+    final month = _selectedMonth != null
+        ? int.tryParse(_selectedMonth!) ?? 1
+        : 1;
     final daysInMonth = DateTime(year, month + 1, 0).day;
     return List.generate(daysInMonth, (i) => '${i + 1}');
   }
@@ -180,9 +265,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     // 3. Validar que la fecha de nacimiento esté completa
-    if (_selectedDay == null || _selectedMonth == null || _selectedYear == null) {
+    if (_selectedDay == null ||
+        _selectedMonth == null ||
+        _selectedYear == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Por favor, selecciona día, mes y año de nacimiento.')), 
+        SnackBar(
+          content: Text('Por favor, selecciona día, mes y año de nacimiento.'),
+        ),
       );
       return;
     }
@@ -206,7 +295,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'email': _emailController.text.trim(),
       'phone': _phoneController.text.trim(),
       // Guardamos la fecha en formato DD/MM/YYYY
-      'birthDate': '${_selectedDay!.padLeft(2, '0')}/${_selectedMonth!}/${_selectedYear!}',
+      'birthDate':
+          '${_selectedDay!.padLeft(2, '0')}/${_selectedMonth!}/${_selectedYear!}',
       'address': {
         'calle': _calleController.text.trim(),
         'numero': _numeroController.text.trim(),
@@ -224,12 +314,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     // 5. Navega a la pantalla de inicio si todo salió bien
     if (result != null) {
       if (!mounted) return;
-      
-      Navigator.pushNamedAndRemoveUntil(
-        context, 
-        '/home', 
-        (route) => false
-      );
+
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -298,87 +384,75 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 30),
 
                 // Sección 1: Datos Personales
-                _buildSectionCard(
-                  "Información Personal",
-                  Icons.person,
-                  [
-                    _buildTextFormField(
-                      _fullNameController,
-                      'Nombre Completo',
-                      icon: Icons.badge_outlined,
-                      focusNode: _fullNameFocus,
-                      validator: (value) {
-                         if (value == null || value.trim().length < 3) {
-                          return 'El nombre debe tener más de 2 caracteres.';
-                        }
-                        if (RegExp(r'\d').hasMatch(value.trim())) {
-                          return 'El nombre no debe contener números.';
-                        }
-                        return null;
-                      },
-                    ),
-                    _buildTextFormField(
-                      _emailController,
-                      'Correo Electrónico',
-                      icon: Icons.email_outlined,
-                      focusNode: _emailFocus,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Por favor, ingresa un correo.';
-                        }
-                        final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                        if (!emailRegex.hasMatch(value.trim())) {
-                          return 'Por favor, ingresa un correo válido.';
-                        }
-                        return null;
-                      },
-                    ),
-                    _buildTextFormField(
-                      _phoneController,
-                      'Teléfono',
-                      icon: Icons.phone_android,
-                      focusNode: _phoneFocus,
-                      keyboardType: TextInputType.phone,
-                      validator: _validatePhone,
-                    ),
-                    _buildBirthDateFields(),
-                  ],
-                ),
-                
+                _buildSectionCard("Información Personal", Icons.person, [
+                  _buildTextFormField(
+                    _fullNameController,
+                    'Nombre Completo',
+                    icon: Icons.badge_outlined,
+                    focusNode: _fullNameFocus,
+                    validator: (value) {
+                      if (value == null || value.trim().length < 3) {
+                        return 'El nombre debe tener más de 2 caracteres.';
+                      }
+                      if (RegExp(r'\d').hasMatch(value.trim())) {
+                        return 'El nombre no debe contener números.';
+                      }
+                      return null;
+                    },
+                  ),
+                  _buildTextFormField(
+                    _emailController,
+                    'Correo Electrónico',
+                    icon: Icons.email_outlined,
+                    focusNode: _emailFocus,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Por favor, ingresa un correo.';
+                      }
+                      final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                      if (!emailRegex.hasMatch(value.trim())) {
+                        return 'Por favor, ingresa un correo válido.';
+                      }
+                      return null;
+                    },
+                  ),
+                  _buildTextFormField(
+                    _phoneController,
+                    'Teléfono',
+                    icon: Icons.phone_android,
+                    focusNode: _phoneFocus,
+                    keyboardType: TextInputType.phone,
+                    validator: _validatePhone,
+                  ),
+                  _buildBirthDateFields(),
+                ]),
+
                 const SizedBox(height: 20),
-                
+
                 // Sección 2: Dirección
-                _buildSectionCard(
-                  "Dirección",
-                  Icons.location_on,
-                  [
-                    _buildAddressFields(),
-                  ],
-                ),
+                _buildSectionCard("Dirección", Icons.location_on, [
+                  _buildAddressFields(),
+                ]),
 
                 const SizedBox(height: 20),
 
                 // Sección 3: Seguridad
-                _buildSectionCard(
-                  "Seguridad",
-                  Icons.lock,
-                  [
-                     _buildTextFormField(
-                      _passwordController,
-                      'Contraseña',
-                      icon: Icons.lock_outline,
-                      focusNode: _passwordFocus,
-                      obscureText: true,
-                      validator: (value) {
-                        if (value == null || value.length <= 6) {
-                          return 'La contraseña debe tener más de 6 caracteres.';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
+                _buildSectionCard("Seguridad", Icons.lock, [
+                  _buildTextFormField(
+                    _passwordController,
+                    'Contraseña',
+                    icon: Icons.lock_outline,
+                    focusNode: _passwordFocus,
+                    obscureText: true,
+                    validator: (value) {
+                      if (value == null || value.length <= 6) {
+                        return 'La contraseña debe tener más de 6 caracteres.';
+                      }
+                      return null;
+                    },
+                  ),
+                ]),
 
                 // Checkbox de Términos y Condiciones
                 Padding(
@@ -387,7 +461,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     value: _acceptTerms,
                     onChanged: (value) =>
                         setState(() => _acceptTerms = value ?? false),
-                    title: const Text('He leído y acepto los Términos y Condiciones', style: TextStyle(fontSize: 14)),
+                    title: const Text(
+                      'He leído y acepto los Términos y Condiciones',
+                      style: TextStyle(fontSize: 14),
+                    ),
                     activeColor: const Color(0xFF0D47A1),
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
@@ -402,16 +479,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onPressed: _register,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0D47A1),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       elevation: 3,
                     ),
-                    child: const Text('Registrarme', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    child: const Text(
+                      'Registrarme',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 15),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar y regresar', style: TextStyle(color: Colors.grey)),
+                  child: const Text(
+                    'Cancelar y regresar',
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 ),
                 const SizedBox(height: 30),
               ],
@@ -481,7 +570,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: icon != null ? Icon(icon, color: Colors.grey[600], size: 20) : null,
+          prefixIcon: icon != null
+              ? Icon(icon, color: Colors.grey[600], size: 20)
+              : null,
           filled: true,
           fillColor: Colors.grey[50],
           enabledBorder: OutlineInputBorder(
@@ -513,7 +604,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Fecha de nacimiento', style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.bold)),
+          const Text(
+            'Fecha de nacimiento',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -534,10 +632,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   value: _selectedMonth,
                   onChanged: (v) => setState(() {
                     _selectedMonth = v;
-                    final year = _selectedYear != null ? int.tryParse(_selectedYear!) ?? DateTime.now().year : DateTime.now().year;
+                    final year = _selectedYear != null
+                        ? int.tryParse(_selectedYear!) ?? DateTime.now().year
+                        : DateTime.now().year;
                     final monthInt = v != null ? int.tryParse(v) ?? 1 : 1;
                     final daysInMonth = DateTime(year, monthInt + 1, 0).day;
-                    if (_selectedDay != null && int.tryParse(_selectedDay!)! > daysInMonth) {
+                    if (_selectedDay != null &&
+                        int.tryParse(_selectedDay!)! > daysInMonth) {
                       _selectedDay = null; // reset invalid day
                     }
                   }),
@@ -551,10 +652,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   value: _selectedYear,
                   onChanged: (v) => setState(() {
                     _selectedYear = v;
-                    final yearInt = v != null ? int.tryParse(v) ?? DateTime.now().year : DateTime.now().year;
-                    final monthInt = _selectedMonth != null ? int.tryParse(_selectedMonth!) ?? 1 : 1;
+                    final yearInt = v != null
+                        ? int.tryParse(v) ?? DateTime.now().year
+                        : DateTime.now().year;
+                    final monthInt = _selectedMonth != null
+                        ? int.tryParse(_selectedMonth!) ?? 1
+                        : 1;
                     final daysInMonth = DateTime(yearInt, monthInt + 1, 0).day;
-                    if (_selectedDay != null && int.tryParse(_selectedDay!)! > daysInMonth) {
+                    if (_selectedDay != null &&
+                        int.tryParse(_selectedDay!)! > daysInMonth) {
                       _selectedDay = null;
                     }
                   }),
@@ -569,22 +675,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Helper para dropdowns consistentes
   Widget _buildDropDown({
-    required String hint, 
-    required List<String> items, 
-    required String? value, 
+    required String hint,
+    required List<String> items,
+    required String? value,
     required Function(String?) onChanged,
-    Map<String,String>? itemLabels,
+    Map<String, String>? itemLabels,
   }) {
     return DropdownButtonFormField<String>(
       decoration: InputDecoration(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
         filled: true,
         fillColor: Colors.grey[50],
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey[300]!)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey[300]!)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
       ),
       hint: Text(hint, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-      items: items.map((val) => DropdownMenuItem(value: val, child: Text(itemLabels?[val] ?? val, style: const TextStyle(fontSize: 13)))).toList(),
+      items: items
+          .map(
+            (val) => DropdownMenuItem(
+              value: val,
+              child: Text(
+                itemLabels?[val] ?? val,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          )
+          .toList(),
       value: value,
       onChanged: onChanged,
       validator: (v) => v == null ? 'Requerido' : null,
@@ -597,25 +719,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (value == null || value.trim().isEmpty) {
       return 'Por favor, ingresa el teléfono.';
     }
-    
+
     final phone = value.trim();
-    
+
     // Rechazar si contiene letras u otros caracteres no numéricos
     if (!RegExp(r'^\d+$').hasMatch(phone)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('⚠️ Advertencia: El teléfono solo debe contener números.'),
+          content: Text(
+            '⚠️ Advertencia: El teléfono solo debe contener números.',
+          ),
           backgroundColor: Colors.orange,
           duration: Duration(seconds: 2),
         ),
       );
       return 'El teléfono solo debe contener números.';
     }
-    
+
     if (phone.length != 10) {
       return 'El teléfono debe tener exactamente 10 dígitos.';
     }
-    
+
     // Patrón secuencial: 0123456789, 1234567890, etc.
     bool isSequential = false;
     for (int i = 0; i < phone.length - 1; i++) {
@@ -628,26 +752,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (isSequential) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('⚠️ Advertencia: El teléfono parece ser un número secuencial.'),
+          content: Text(
+            '⚠️ Advertencia: El teléfono parece ser un número secuencial.',
+          ),
           backgroundColor: Colors.orange,
           duration: Duration(seconds: 2),
         ),
       );
       return 'Por favor, ingresa un teléfono válido.';
     }
-    
+
     // Patrón repetitivo: 1111111111, 5555555555, etc.
     if (phone.split('').toSet().length == 1) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('⚠️ Advertencia: El teléfono no puede tener todos los dígitos iguales.'),
+          content: Text(
+            '⚠️ Advertencia: El teléfono no puede tener todos los dígitos iguales.',
+          ),
           backgroundColor: Colors.orange,
           duration: Duration(seconds: 2),
         ),
       );
       return 'Por favor, ingresa un teléfono válido.';
     }
-    
+
     return null;
   }
 
@@ -660,14 +788,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String cp,
   }) {
     // Rechazar palabras ofensivas/absurdas comunes
-    final prohibitedWords = ['tonto', 'falso', 'test', 'demo', 'prueba', 'xxx', 'aaa', 'bbb'];
+    final prohibitedWords = [
+      'tonto',
+      'falso',
+      'test',
+      'demo',
+      'prueba',
+      'xxx',
+      'aaa',
+      'bbb',
+    ];
     final inputLower = '$calle $colonia $municipio'.toLowerCase();
-    
+
     for (final word in prohibitedWords) {
       if (inputLower.contains(word)) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('⚠️ Advertencia: Dirección incoherente. Por favor, ingresa datos reales.'),
+            content: Text(
+              '⚠️ Advertencia: Dirección incoherente. Por favor, ingresa datos reales.',
+            ),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 3),
           ),
@@ -675,7 +814,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return 'La dirección debe ser coherente y real.';
       }
     }
-    
+
     // Validar que los campos no sean solo números
     if (RegExp(r'^\d+$').hasMatch(calle.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -687,7 +826,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return 'La calle debe contener letras.';
     }
-    
+
     // Validar formato CP (números de 5 dígitos en México)
     if (!RegExp(r'^\d{5}$').hasMatch(cp.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -699,7 +838,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return 'El código postal debe tener 5 dígitos.';
     }
-    
+
     return null;
   }
 
@@ -710,9 +849,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Dirección', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text(
+            'Dirección',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 5),
-          
+
           // Calle
           _buildTextFormField(
             _calleController,
@@ -727,7 +869,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               if (RegExp(r'\d').hasMatch(value.trim())) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('⚠️ Advertencia: La calle no puede contener números.'),
+                    content: Text(
+                      '⚠️ Advertencia: La calle no puede contener números.',
+                    ),
                     backgroundColor: Colors.orange,
                     duration: Duration(seconds: 2),
                   ),
@@ -737,7 +881,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               return null;
             },
           ),
-          
+
           // Número (ext/int) y Colonia en fila
           Row(
             children: [
@@ -754,7 +898,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('⚠️ Advertencia: El número solo debe contener dígitos.'),
+                          content: Text(
+                            '⚠️ Advertencia: El número solo debe contener dígitos.',
+                          ),
                           backgroundColor: Colors.orange,
                           duration: Duration(seconds: 2),
                         ),
@@ -778,7 +924,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (RegExp(r'\d').hasMatch(value.trim())) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('⚠️ Advertencia: La colonia no puede contener números.'),
+                          content: Text(
+                            '⚠️ Advertencia: La colonia no puede contener números.',
+                          ),
                           backgroundColor: Colors.orange,
                           duration: Duration(seconds: 2),
                         ),
@@ -791,7 +939,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ],
           ),
-          
+
           // Estado y Municipio en fila
           Row(
             children: [
@@ -799,7 +947,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Estado', style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Estado',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 5),
                     DropdownButtonFormField<String>(
                       isExpanded: true,
@@ -807,11 +962,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hintText: 'Selecciona Estado',
                         filled: true,
                         fillColor: Colors.grey[50], // Fondo gris claro
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey[300]!)), // Borde gris suave
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey[300]!)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ), // Borde gris suave
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                       ),
-                      items: _estadosMexico.map((edo) => DropdownMenuItem(value: edo, child: Text(edo, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)))).toList(),
+                      items: _estadosMexico
+                          .map(
+                            (edo) => DropdownMenuItem(
+                              value: edo,
+                              child: Text(
+                                edo,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ),
+                          )
+                          .toList(),
                       value: _selectedEstado,
                       onChanged: (val) {
                         setState(() {
@@ -822,7 +997,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           _municipioController.clear();
                         });
                       },
-                      validator: (val) => val == null || val.isEmpty ? 'Requerido' : null,
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Requerido' : null,
                     ),
                   ],
                 ),
@@ -833,20 +1009,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ? Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Municipio', style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.bold)),
+                          const Text(
+                            'Municipio',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 5),
                           DropdownButtonFormField<String>(
-
                             isExpanded: true,
                             decoration: InputDecoration(
                               hintText: 'Selecciona Municipio',
                               filled: true,
                               fillColor: Colors.grey[50],
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey[300]!)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey[300]!)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                             ),
-                            items: _municipiosZacatecas.map((mun) => DropdownMenuItem(value: mun, child: Text(mun, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)))).toList(),
+                            items: _municipiosZacatecas
+                                .map(
+                                  (mun) => DropdownMenuItem(
+                                    value: mun,
+                                    child: Text(
+                                      mun,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
                             value: _selectedMunicipioZac,
                             onChanged: (val) {
                               setState(() {
@@ -854,7 +1060,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 _municipioController.text = val ?? '';
                               });
                             },
-                            validator: (val) => val == null || val.isEmpty ? 'Requerido' : null,
+                            validator: (val) =>
+                                val == null || val.isEmpty ? 'Requerido' : null,
                           ),
                         ],
                       )
@@ -875,7 +1082,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ],
           ),
-          
+
           // CP
           _buildTextFormField(
             _cpController,
@@ -888,7 +1095,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('⚠️ Advertencia: El CP solo debe contener números.'),
+                    content: Text(
+                      '⚠️ Advertencia: El CP solo debe contener números.',
+                    ),
                     backgroundColor: Colors.orange,
                     duration: Duration(seconds: 2),
                   ),

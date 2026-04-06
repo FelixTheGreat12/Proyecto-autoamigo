@@ -210,14 +210,29 @@ class MisAutosScreen extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    if (autoData['pricePerDay'] != null) ...[
+                                    if (autoData['pricePerKm'] != null) ...[
                                       Icon(
                                         Icons.attach_money,
                                         size: 14,
                                         color: Colors.green[700],
                                       ),
                                       Text(
-                                        '${autoData['pricePerDay']}/día',
+                                        '${autoData['pricePerKm']}/km',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green[700],
+                                        ),
+                                      ),
+                                    ] else if (autoData['pricePerDay'] !=
+                                        null) ...[
+                                      Icon(
+                                        Icons.attach_money,
+                                        size: 14,
+                                        color: Colors.green[700],
+                                      ),
+                                      Text(
+                                        '${autoData['pricePerDay']}/km (legado)',
                                         style: TextStyle(
                                           color: Colors.green[800],
                                           fontSize: 14,
@@ -276,7 +291,6 @@ class MisAutosScreen extends StatelessWidget {
           );
         },
       ),
-
     );
   }
 }
