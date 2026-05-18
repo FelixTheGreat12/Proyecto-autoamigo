@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'detalle_solicitud_screen.dart';
 
-class SolicitudesRentaScreen extends StatelessWidget {
-  const SolicitudesRentaScreen({super.key});
+class HistorialRentasPropietarioScreen extends StatelessWidget {
+  const HistorialRentasPropietarioScreen({super.key});
 
   // Función para obtener el nombre del inquilino
   Future<String> _getTenantName(String tenantId) async {
@@ -77,6 +77,45 @@ class SolicitudesRentaScreen extends StatelessWidget {
     }
   }
 
+  // Eliminar registro del historial
+  Future<void> _deleteRental(BuildContext context, String rentalId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar del Historial'),
+        content: const Text('¿Estás seguro de que deseas eliminar este registro permanentemente?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('rentals').doc(rentalId).delete();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registro eliminado.'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
@@ -92,7 +131,7 @@ class SolicitudesRentaScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
-          'Solicitudes de Renta',
+          'Historial de Rentas',
           style: TextStyle(
             color: Color(0xFF1565C0),
             fontWeight: FontWeight.bold,
@@ -124,9 +163,12 @@ class SolicitudesRentaScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // Solo solicitudes pendientes
-          final docs = (snapshot.data?.docs ?? []).where((doc) {
-            return (doc.data() as Map<String, dynamic>)['status'] == 'pending';
+          // Filtramos localmente para evitar requerir índices compuestos extra
+          final allDocs = snapshot.data?.docs ?? [];
+          final docs = allDocs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = data['status'] ?? '';
+            return ['completed', 'rejected', 'cancelled', 'finalizado'].contains(status);
           }).toList();
 
           if (docs.isEmpty) {
@@ -134,10 +176,10 @@ class SolicitudesRentaScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
+                  Icon(Icons.history, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'No tienes solicitudes pendientes',
+                    'No hay historial para mostrar',
                     style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                   ),
                 ],
@@ -281,7 +323,16 @@ class SolicitudesRentaScreen extends StatelessWidget {
                           ),
                         ),
 
-                        // Botones eliminados por solicitud
+                        // Botón de eliminar del historial
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () => _deleteRental(context, rentalId),
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            label: const Text('Eliminar del historial', style: TextStyle(color: Colors.red)),
+                          ),
+                        ),
                       ],
                     ),
                   ),

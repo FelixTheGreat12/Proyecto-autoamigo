@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'ubicacion_auto_screen.dart';
-import 'pdf_viewer_screen.dart';
 import 'arrendatario_rastreo_widget.dart';
+import 'calificar_viaje_screen.dart';
+import 'resenas_usuario_screen.dart';
+import 'pdf_viewer_screen.dart';
 
-class DetalleRentaArrendatarioScreen extends StatelessWidget {
+class DetalleRentaArrendatarioScreen extends StatefulWidget {
   final String rentalId;
   final String ownerId;
   final Map<String, dynamic> rentalData;
@@ -17,12 +19,55 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
     required this.rentalData,
   });
 
+  @override
+  State<DetalleRentaArrendatarioScreen> createState() => _DetalleRentaArrendatarioScreenState();
+}
+
+class _DetalleRentaArrendatarioScreenState extends State<DetalleRentaArrendatarioScreen> {
+  bool _hasShownRatingDialog = false;
+
+  Future<Map<String, dynamic>?> _getCarDocuments(String autoId) async {
+    if (autoId.isEmpty) return null;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('autos')
+          .doc(autoId)
+          .collection('documentos')
+          .doc('documentos_info')
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        return doc.data()!['documents'] as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('Error getting car documents: $e');
+    }
+    return null;
+  }
+
+  void _openDocument(BuildContext context, String? url, String title) {
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Documento no disponible')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PDFViewerScreen(url: url, title: title),
+      ),
+    );
+  }
+
   // Fetch owner data to display contact info
   Future<Map<String, dynamic>?> _getOwnerData() async {
     try {
       final doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(ownerId)
+          .doc(widget.ownerId)
           .get();
       return doc.data();
     } catch (e) {
@@ -31,15 +76,91 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
     }
   }
 
-  // Método para abrir URLs
-  Future<void> _launchUrl(BuildContext context, String urlString) async {
-    final Uri url = Uri.parse(urlString);
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo abrir el archivo: $urlString')),
-        );
+  Future<void> _updateStatus(BuildContext context, String newStatus) async {
+    try {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cancelar Renta'),
+          content: const Text(
+            '¿Estás seguro de que deseas cancelar este viaje? Esta acción no se puede deshacer.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Volver'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Sí, Cancelar', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
+      // Flujo Stripe - Cancelar Pre-autorización y devolver fondos
+      final String paymentId = widget.rentalData['stripePaymentIntentId'] ?? '';
+      if (paymentId.isNotEmpty && newStatus == 'cancelled') {
+        try {
+          await FirebaseFunctions.instance.httpsCallable('cancelPayment').call({
+            'paymentIntentId': paymentId,
+          });
+        } catch (e) {
+          debugPrint('Error al cancelar pago: $e');
+        }
       }
+
+      await FirebaseFirestore.instance
+          .collection('rentals')
+          .doc(widget.rentalId)
+          .update({'status': newStatus});
+
+      final autoId = widget.rentalData['autoId']?.toString() ?? '';
+      if (newStatus == 'cancelled' && autoId.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('autos')
+            .doc(autoId)
+            .update({'status': 'registrado'})
+            .catchError((e) => debugPrint('Error devolviendo auto a registrado: $e'));
+      }
+
+      // Notificar al propietario
+      final ownerId = widget.rentalData['ownerId'];
+      if (ownerId != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(ownerId)
+            .collection('notifications')
+            .add({
+          'title': 'Renta Cancelada',
+          'body': 'El arrendatario ha cancelado la renta del auto.',
+          'type': 'status_update',
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'referenceId': widget.rentalId,
+        });
+      }
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Renta cancelada exitosamente.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cancelar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -56,7 +177,7 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('rentals')
-            .doc(rentalId)
+            .doc(widget.rentalId)
             .snapshots(),
         builder: (context, rentalSnapshot) {
           if (rentalSnapshot.connectionState == ConnectionState.waiting) {
@@ -93,8 +214,12 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
           final double distanciaFinal = (currentRentalData['distanciaRecorridaKm'] ?? 0).toDouble();
           final double finalBasePay = (currentRentalData['finalBasePay'] ?? (distanciaFinal * price)).toDouble();
           final double finalCommission = (currentRentalData['finalCommission'] ?? (finalBasePay * 0.20)).toDouble();
-          // Forzar la suma correcta en la UI para viajes anteriores que se guardaron con la lógica vieja
-          final double finalTotalPay = finalBasePay + finalCommission;
+          
+          // Usar el total estimado original si existe (ya que fue lo que se retuvo y cobró en Stripe)
+          // de lo contrario usar el cálculo de base + comisión.
+          final double finalTotalPay = estimatedTotal > 0 
+              ? estimatedTotal 
+              : finalBasePay + finalCommission;
 
           int days = 0;
           if (startDateStr != null && endDateStr != null) {
@@ -103,6 +228,91 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
               final end = DateTime.parse(endDateStr);
               days = end.difference(start).inDays + 1;
             } catch (_) {}
+          }
+
+          // Lógica para mostrar el diálogo automáticamente si el viaje terminó y el dueño no ha recibido calificación local.
+          if (status == 'completed' &&
+              currentRentalData['ownerRating'] == null &&
+              !_hasShownRatingDialog) {
+            _hasShownRatingDialog = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              showDialog(
+                context: context,
+                barrierDismissible: true,
+                builder: (ctx) => Dialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.verified,
+                          color: Colors.green,
+                          size: 64,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '¡Viaje Finalizado!',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF263238),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Por favor califica al dueño y al auto para ayudar a la comunidad.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Color(0xFF546E7A),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(ctx); // Cierra el dialog
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CalificarViajeScreen(
+                                    rentalId: widget.rentalId,
+                                    targetUserId: widget.ownerId,
+                                    role: 'owner',
+                                  ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1565C0),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text('Calificar ahora'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text(
+                            'Calificar más tarde',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            });
           }
 
           final timestamp = currentRentalData['createdAt'] as Timestamp?;
@@ -122,14 +332,16 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                   userData['fullName'] ?? 'Propietario desconocido';
               final email = userData['email'] ?? 'No disponible';
               final phone = userData['phone'] ?? 'No registrado';
+                final autoId = (currentRentalData['autoId'] ?? widget.rentalData['autoId'] ?? '').toString();
 
               String address = 'No registrada';
               if (userData['address'] != null && userData['address'] is Map) {
                 final addr = userData['address'] as Map;
                 address =
                     '${addr['calle'] ?? ''} ${addr['numero'] ?? ''}, ${addr['colonia'] ?? ''}';
-                if (addr['municipio'] != null)
+                if (addr['municipio'] != null) {
                   address += ', ${addr['municipio']}';
+                }
               }
 
               final initial = fullName.isNotEmpty
@@ -144,9 +356,9 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                     // Solo mostramos la información del propietario si el viaje no ha finalizado
                     if (status != 'completed' && status != 'rejected') ...[
                       // 1. HEADER: INFO DEL PROPIETARIO
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12, left: 4),
-                        child: const Text(
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 12, left: 4),
+                        child: Text(
                           'Datos del Propietario',
                           style: TextStyle(
                             fontSize: 18,
@@ -155,56 +367,134 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 30,
-                                backgroundColor: Colors.green[100],
-                                child: Text(
-                                  initial,
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green[800],
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(widget.ownerId)
+                            .collection('reviews')
+                            .where('roleEvaluated', isEqualTo: 'owner')
+                            .snapshots(),
+                        builder: (context, reviewSnapshot) {
+                          double average = 0.0;
+                          int total = 0;
+                          if (reviewSnapshot.hasData) {
+                            final docs = reviewSnapshot.data!.docs;
+                            total = docs.length;
+                            if (total > 0) {
+                              double sum = 0;
+                              for (var doc in docs) {
+                                final data = doc.data() as Map<String, dynamic>;
+                                sum += (data['rating'] as num?)?.toDouble() ?? 0.0;
+                              }
+                              average = sum / total;
+                            }
+                          }
+
+                          return InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ResenasUsuarioScreen(
+                                    userId: widget.ownerId,
+                                    role: 'owner',
                                   ),
                                 ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Card(
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Row(
                                   children: [
-                                    Text(
-                                      fullName,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF263238),
+                                    CircleAvatar(
+                                      radius: 30,
+                                      backgroundColor: Colors.green[100],
+                                      child: Text(
+                                        initial,
+                                        style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green[800],
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    _buildInfoRow(Icons.email_outlined, email),
-                                    const SizedBox(height: 4),
-                                    _buildInfoRow(Icons.phone_outlined, phone),
-                                    const SizedBox(height: 4),
-                                    _buildInfoRow(
-                                      Icons.location_on_outlined,
-                                      address,
-                                      maxLines: 2,
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  fullName,
+                                                  style: const TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF263238),
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              if (total > 0)
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.star, color: Colors.amber, size: 18),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      average.toStringAsFixed(1),
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      ' ($total)',
+                                                      style: const TextStyle(
+                                                        color: Colors.grey,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              if (total == 0)
+                                                const Text(
+                                                  'Nuevo',
+                                                  style: TextStyle(
+                                                    color: Colors.green,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          _buildInfoRow(Icons.email_outlined, email),
+                                          const SizedBox(height: 4),
+                                          _buildInfoRow(Icons.phone_outlined, phone),
+                                          const SizedBox(height: 4),
+                                          _buildInfoRow(
+                                            Icons.location_on_outlined,
+                                            address,
+                                            maxLines: 2,
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
+                            ),
+                          );
+                        }
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -286,20 +576,61 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                               ],
                             ),
                             const Divider(height: 24),
+                            // Se asume que finalTotalPay fue calculado al inicio de la pantalla
                             _buildDetailRow(
-                              'Kilómetros reales',
-                              '${distanciaFinal.toStringAsFixed(2)} km',
-                            ),
-                            _buildDetailRow('Precio por km', '\$$price MXN'),
-                            const SizedBox(height: 4),
-                            _buildDetailRow('Subtotal', '\$${finalBasePay.toStringAsFixed(2)} MXN'),
-                            _buildDetailRow('Tarifa de servicio (20%)', '\$${finalCommission.toStringAsFixed(2)} MXN'),
-                            const Divider(height: 24),
-                            _buildDetailRow(
-                              'Total a Pagar',
-                              '\$${finalTotalPay.toStringAsFixed(2)} MXN',
+                              'Pago original (Aprobado al inicio)',
+                              '\$$finalTotalPay MXN',
                               color: Colors.teal[800],
                             ),
+                            if (paymentMethod == 'Tarjeta' || paymentMethod == 'Tarjeta (Retenido)') ...[
+                              const SizedBox(height: 24),
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.teal.shade200),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.check_circle, color: Colors.teal[700]),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Pago con tarjeta liquidado al inicio.',
+                                      style: TextStyle(
+                                        color: Colors.teal[800],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else if (paymentMethod == 'Efectivo') ...[
+                              const SizedBox(height: 24),
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.green.shade200),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.payments, color: Colors.green[700]),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Pago en Efectivo (A liquidar en persona)',
+                                      style: TextStyle(
+                                        color: Colors.green[800],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -392,7 +723,7 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
 
                       // AGREGAMOS EL WIDGET PARA COMPARTIR UBICACIÓN GPS
                       const SizedBox(height: 16),
-                      ArrendatarioRastreoWidget(rentalId: rentalId),
+                      ArrendatarioRastreoWidget(rentalId: widget.rentalId),
                     ] else if (status == 'rejected') ...[
                       // ESTADO: RECHAZADA
                       Container(
@@ -481,7 +812,196 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                       ),
                     ],
 
+                    if (status != 'completed' && status != 'rejected') ...[
+                      const SizedBox(height: 24),
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 12, left: 4),
+                        child: Text(
+                          'Documentación del Vehículo',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF455A64),
+                          ),
+                        ),
+                      ),
+                      FutureBuilder<Map<String, dynamic>?>(
+                        future: _getCarDocuments(autoId),
+                        builder: (context, docsSnapshot) {
+                          if (docsSnapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+
+                          final docs = docsSnapshot.data;
+                          final tarjetaUrl = docs?['Tarjeta de circulación']?.toString();
+                          final verificacionUrl = docs?['Comprobante de verificación vehicular']?.toString();
+                          final polizaUrl = docs?['Póliza de seguro']?.toString();
+
+                          final hasAny =
+                              (tarjetaUrl != null && tarjetaUrl.isNotEmpty) ||
+                              (verificacionUrl != null && verificacionUrl.isNotEmpty) ||
+                              (polizaUrl != null && polizaUrl.isNotEmpty);
+
+                          if (!hasAny) {
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: Colors.grey),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'El propietario aún no ha subido documentos del vehículo.',
+                                      style: TextStyle(color: Colors.grey),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildDocCard(
+                                      context,
+                                      'Tarjeta de circulación',
+                                      Icons.credit_card,
+                                      tarjetaUrl,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildDocCard(
+                                      context,
+                                      'Verificación vehicular',
+                                      Icons.verified,
+                                      verificacionUrl,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildDocCard(
+                                      context,
+                                      'Póliza de seguro',
+                                      Icons.security,
+                                      polizaUrl,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(child: SizedBox()),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+
                     const SizedBox(height: 24),
+
+                    if (status == 'completed') ...[
+                      const Divider(height: 32, thickness: 1),
+                      if (currentRentalData['ownerRating'] == null)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.amber.shade300),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.star, color: Colors.amber[800]),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Califica tu Viaje',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.amber[900],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Ayuda a otros usuarios calificando al propietario y su vehículo.',
+                                style: TextStyle(color: Colors.amber[900]),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => CalificarViajeScreen(
+                                          rentalId: widget.rentalId,
+                                          targetUserId: widget.ownerId,
+                                          role: 'owner',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.amber[700],
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: const Text('Ir a calificar'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.check_circle, color: Colors.green),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Calificaste este viaje con ${currentRentalData['ownerRating']} estrellas',
+                                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 24),
+                    ],
 
                     // 3. UBICACIÓN DE ENTREGA
                     Padding(
@@ -653,178 +1173,41 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
                       ),
                     ),
 
-                    if ((status == 'approved' || status == 'in_progress') &&
-                        rentalData['autoId'] != null) ...[
-                      const SizedBox(height: 24),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12, left: 4),
-                        child: const Text(
-                          'Documentos del Vehículo',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF455A64),
+                    // BOTON CANCELAR VIAJE PARA ARRENDATARIO (Solo pending o approved)
+                    if (status == 'pending' || status == 'approved') ...[
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _updateStatus(context, 'cancelled'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                          label: const Text(
+                            'Cancelar Renta',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                       ),
-                      FutureBuilder<DocumentSnapshot>(
-                        future: FirebaseFirestore.instance
-                            .collection('autos')
-                            .doc(rentalData['autoId'])
-                            .collection('documentos')
-                            .doc('documentos_info')
-                            .get(),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-
-                          if (!snapshot.hasData || !snapshot.data!.exists) {
-                            return const Card(
-                              child: Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text(
-                                  'No hay documentos disponibles para este auto.',
-                                ),
-                              ),
-                            );
-                          }
-
-                          final data =
-                              snapshot.data!.data() as Map<String, dynamic>?;
-                          final docs =
-                              data?['documents'] as Map<String, dynamic>? ?? {};
-
-                          if (docs.isEmpty) {
-                            return const Card(
-                              child: Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text(
-                                  'El propietario no ha subido documentos.',
-                                ),
-                              ),
-                            );
-                          }
-
-                          return GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                  childAspectRatio: 1.3,
-                                ),
-                            itemCount: docs.length,
-                            itemBuilder: (context, index) {
-                              final entry = docs.entries.elementAt(index);
-                              final key = entry.key;
-                              final url = entry.value.toString();
-
-                              IconData icon = Icons.description;
-                              if (key.contains('Seguro')) icon = Icons.security;
-                              if (key.contains('Circulación'))
-                                icon = Icons.credit_card;
-                              if (key.contains('Verificación'))
-                                icon = Icons.verified;
-                              if (key.contains('Foto')) icon = Icons.image;
-
-                              return _buildDocCard(context, key, icon, url);
-                            },
-                          );
-                        },
-                      ),
                     ],
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 32),
                   ],
                 ),
               );
             },
           );
         },
-      ),
-    );
-  }
-
-  void _openDocument(BuildContext context, String? url, String title) {
-    if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Documento no disponible')));
-      return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PDFViewerScreen(url: url, title: title),
-      ),
-    );
-  }
-
-  Widget _buildDocCard(
-    BuildContext context,
-    String label,
-    IconData icon,
-    String? url,
-  ) {
-    final bool hasDoc = url != null && url.isNotEmpty;
-
-    return InkWell(
-      onTap: () => hasDoc ? _openDocument(context, url, label) : null,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: hasDoc ? Colors.blue[300]! : Colors.grey[300]!,
-          ),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 32,
-                  color: hasDoc ? const Color(0xFF1565C0) : Colors.grey[400],
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: hasDoc
-                          ? const Color(0xFF1565C0)
-                          : Colors.grey[500],
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (hasDoc)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Icon(
-                  Icons.visibility,
-                  size: 16,
-                  color: Colors.blue[300],
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -869,6 +1252,59 @@ class DetalleRentaArrendatarioScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDocCard(
+    BuildContext context,
+    String label,
+    IconData icon,
+    String? url,
+  ) {
+    final bool hasDoc = url != null && url.isNotEmpty;
+
+    return InkWell(
+      onTap: () => hasDoc ? _openDocument(context, url, label) : null,
+      child: Container(
+        height: 100,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasDoc ? Colors.blue[300]! : Colors.grey[300]!,
+          ),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  color: hasDoc ? const Color(0xFF1565C0) : Colors.grey,
+                  size: 28,
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: hasDoc ? const Color(0xFF263238) : Colors.grey,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

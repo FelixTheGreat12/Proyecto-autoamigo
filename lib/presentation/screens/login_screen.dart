@@ -1,4 +1,5 @@
 import 'package:autoamigo/infrastructure/auth/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -62,10 +63,33 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text.trim(),
     );
 
-    if (result != null) {
+    if (result != null && result.user != null) {
       if (!mounted) return;
-      // Navegar a la pantalla de inicio
-      Navigator.pushReplacementNamed(context, '/home');
+
+      // Obtener el rol del usuario desde Firestore
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(result.user!.uid).get();
+      final userData = userDoc.data() as Map<String, dynamic>?;
+
+      if (userData?['isBlocked'] == true) {
+        if (!mounted) return;
+        await _authService.signOut(); // Usando un signOut propio para limpiar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tu cuenta ha sido bloqueada. Contacta soporte.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return; // No lo dejamos entrar
+      }
+
+      final role = userData?['role'] ?? 'user';
+      if (role == 'admin') {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/adminDashboard');
+      } else {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     } else {
       if (!mounted) return;
       // Mostrar un error más descriptivo

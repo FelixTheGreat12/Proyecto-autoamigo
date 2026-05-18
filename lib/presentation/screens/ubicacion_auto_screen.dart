@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
@@ -25,6 +27,45 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
     _geocodeAddress();
   }
 
+  Future<BitmapDescriptor> _createCarMarker() async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    const double size = 110.0;
+
+    // Fondo azul circular
+    final Paint paint = Paint()..color = const Color(0xFF1565C0); // Azul principal
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2.2, paint);
+
+    // Borde blanco
+    final Paint borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6.0;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2.2, borderPaint);
+
+    // Dibujar el icono de auto de material icons en blanco
+    const IconData iconData = Icons.directions_car;
+    TextPainter textPainter = TextPainter(textDirection: TextDirection.rtl);
+    textPainter.text = TextSpan(
+      text: String.fromCharCode(iconData.codePoint),
+      style: TextStyle(
+        fontSize: size * 0.6,
+        fontFamily: iconData.fontFamily,
+        package: iconData.fontPackage,
+        color: Colors.white,
+      ),
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset((size - textPainter.width) / 2, (size - textPainter.height) / 2),
+    );
+
+    final ui.Image image = await pictureRecorder.endRecording().toImage(size.toInt(), size.toInt());
+    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+  }
+
   Future<void> _geocodeAddress() async {
     try {
       // Intentar obtener las coordenadas de la dirección
@@ -32,6 +73,10 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
 
       if (locations.isNotEmpty) {
         final loc = locations.first;
+        
+        // Creamos el ícono del auto dinámicamente antes de agregar el marcador
+        BitmapDescriptor carMarkerIcon = await _createCarMarker();
+        
         setState(() {
           _targetLocation = LatLng(loc.latitude, loc.longitude);
           _markers.add(
@@ -39,9 +84,7 @@ class _UbicacionAutoScreenState extends State<UbicacionAutoScreen> {
               markerId: const MarkerId('car_location'),
               position: _targetLocation!,
               infoWindow: const InfoWindow(title: 'Punto de entrega'),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueRed,
-              ),
+              icon: carMarkerIcon, // Se asigna el icono generado
             ),
           );
           _isLoading = false;

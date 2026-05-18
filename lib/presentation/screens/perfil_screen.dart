@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'editar_perfil_screen.dart';
 
 class PerfilScreen extends StatelessWidget {
   const PerfilScreen({super.key});
@@ -70,10 +71,10 @@ class PerfilScreen extends StatelessWidget {
                   icon: Icons.person_outline,
                   title: 'Editar mis datos',
                   onTap: () {
-                    // Pendiente: Editar perfil
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Próximamente: Editar Perfil'),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EditarPerfilScreen(),
                       ),
                     );
                   },

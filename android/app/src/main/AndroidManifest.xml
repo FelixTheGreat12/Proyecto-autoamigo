@@ -3,12 +3,23 @@
     <!-- Permisos para usar Geolocator (Rastreo GPS) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    
+    <!-- Permisos para rastreo en segundo plano (Background) -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
         android:label="autoamigo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         
+        <!-- Requerido para Geolocalización en Background con Notificación Persistente -->
+        <service
+            android:name="com.baseflow.geolocator.GeolocatorLocationService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
         <!-- Fija los problemas de Google Maps en versiones recientes de Android -->
         <uses-library android:name="org.apache.http.legacy" android:required="false" />
         

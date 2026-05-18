@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'detalle_solicitud_screen.dart';
 
-class SolicitudesRentaScreen extends StatelessWidget {
-  const SolicitudesRentaScreen({super.key});
+class RentasActivasPropietarioScreen extends StatelessWidget {
+  const RentasActivasPropietarioScreen({super.key});
 
   // Función para obtener el nombre del inquilino
   Future<String> _getTenantName(String tenantId) async {
@@ -92,7 +92,7 @@ class SolicitudesRentaScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
-          'Solicitudes de Renta',
+          'Rentadas y Solicitudes',
           style: TextStyle(
             color: Color(0xFF1565C0),
             fontWeight: FontWeight.bold,
@@ -124,9 +124,12 @@ class SolicitudesRentaScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // Solo solicitudes pendientes
-          final docs = (snapshot.data?.docs ?? []).where((doc) {
-            return (doc.data() as Map<String, dynamic>)['status'] == 'pending';
+          // Filtramos localmente los estados activos
+          final allDocs = snapshot.data?.docs ?? [];
+          final docs = allDocs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = data['status'] ?? 'pending';
+            return ['pending', 'approved', 'in_progress', 'ocupado', 'en_curso'].contains(status);
           }).toList();
 
           if (docs.isEmpty) {
@@ -137,7 +140,7 @@ class SolicitudesRentaScreen extends StatelessWidget {
                   Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'No tienes solicitudes pendientes',
+                    'No tienes solicitudes ni rentas activas',
                     style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                   ),
                 ],

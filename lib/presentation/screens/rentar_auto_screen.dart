@@ -1,18 +1,21 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import '../widgets/car_image_loader.dart';
+import 'resenas_usuario_screen.dart';
 
 class RentarAutoScreen extends StatelessWidget {
   final String autoId;
   final Map<String, dynamic> carData;
-  final double pricePerKm;
+  final double pricePerDay;
 
   const RentarAutoScreen({
     super.key,
     required this.autoId,
     required this.carData,
-    required this.pricePerKm,
+    required this.pricePerDay,
   });
 
   // Obtiene datos del dueño
@@ -38,8 +41,9 @@ class RentarAutoScreen extends StatelessWidget {
     DateTime startDate,
     DateTime endDate,
     double total,
-    String paymentMethod,
-  ) async {
+    String paymentMethod, {
+    String? paymentIntentId, // Guardamos el ID de referencia del pago con tarjeta
+  }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -57,21 +61,36 @@ class RentarAutoScreen extends StatelessWidget {
       );
 
       // Crear solicitud en Firestore
-      await FirebaseFirestore.instance.collection('rentals').add({
+      final docRef = await FirebaseFirestore.instance.collection('rentals').add({
         'autoId': autoId,
         'tenantId': user.uid,
         'ownerId': carData['userId'],
         'status': 'pending', // pending, approved, rejected, completed
         'createdAt': FieldValue.serverTimestamp(),
-        'pricePerKm': pricePerKm,
+        'pricePerDay': pricePerDay,
         'estimatedTotal': total,
         'paymentMethod': paymentMethod,
+        'stripePaymentIntentId': paymentIntentId,
         'startDate': startDate.toIso8601String(),
         'endDate': endDate.toIso8601String(),
         'carBrand': carData['brand'],
         'carModel': carData['model'],
         'carYear': carData['year'],
         'carColor': carData['color'],
+      });
+
+      // Crear notificación para el dueño
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(carData['userId'])
+          .collection('notifications')
+          .add({
+        'title': 'Nueva Solicitud de Renta',
+        'body': 'Han solicitado rentar tu ${carData['brand']} ${carData['model']}.',
+        'type': 'rental_request',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'referenceId': docRef.id,
       });
 
       if (context.mounted) {
@@ -134,6 +153,96 @@ class RentarAutoScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _iniciarPagoStripe(
+    BuildContext context,
+    DateTime startDate,
+    DateTime endDate,
+    double totalEstimated,
+  ) async {
+    try {
+      // 1. Mostrar un loader mientras preparamos el pago
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (c) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // 2. Llamar a la Cloud Function para crear el Payment Intent
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('createPaymentIntent');
+
+      final result = await callable.call({
+        'amount': totalEstimated,
+        'currency': 'mxn',
+        'ownerId': carData['userId'], // Pasamos el dueño para el split de pagos
+      });
+
+      final String clientSecret = result.data['clientSecret'];
+      final String paymentIntentId = result.data['paymentIntentId'];
+
+      // 3. Ocultar el loader superior
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      // 4. Configurar la hoja de pagos de Stripe (PaymentSheet)
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'AutoAmigo',
+          style: ThemeMode.light, // Puedes usar dark si es necesario
+        ),
+      );
+
+      // 5. Presentar el formulario de pago y esperar confirmación
+      await Stripe.instance.presentPaymentSheet();
+
+      // 6. ¡Éxito! El cobro se procesó al inicio. Proceder con la solicitud de renta.
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pago pre-autorizado. Registrando solicitud...'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Terminamos de generar el viaje en Firestore guardando el paymentIntentId
+        await _solicitarRenta(
+          context,
+          startDate,
+          endDate,
+          totalEstimated,
+          'Tarjeta',
+          paymentIntentId: paymentIntentId,
+        );
+      }
+
+    } on StripeException catch (e) {
+      if (context.mounted) {
+        // En caso de que se aborte la PaymentSheet y ya tuviésemos el loading abierto,
+        // no pasa nada, ya se cerró arriba. Si hay error en Stripe:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Pago cancelado o fallido (${e.error.localizedMessage})'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        // Si el loading seguía activo, cerrarlo
+        // A veces falla la CF y el loader sigue
+        Navigator.of(context, rootNavigator: true).pop();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error interno en el cobro: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _mostrarCheckoutFront(BuildContext context) async {
     // 1. Mostrar selector de fechas
     final DateTimeRange? picked = await showDateRangePicker(
@@ -166,13 +275,6 @@ class RentarAutoScreen extends StatelessWidget {
         picked.end.difference(picked.start).inDays +
         1; // +1 si rentar hoy y devolver hoy es 1 día
 
-    // Valor inicial del slider
-    double kmEstimados = (50 * days).toDouble();
-    final TextEditingController kmController = TextEditingController(
-      text: kmEstimados.toInt().toString(),
-    );
-
-    // Método de pago por defecto
     String metodoPago = 'Efectivo';
 
     // Función auxiliar para meses
@@ -204,12 +306,12 @@ class RentarAutoScreen extends StatelessWidget {
       builder: (bottomSheetContext) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
-            // Recálculo dinámico basado en el control del slider
-            final double estimatedMileageCost = pricePerKm * kmEstimados;
+            // Cálculo de tarifa por días
+            final double baseCost = pricePerDay * days;
             final double comisionAutoAmigo =
-                estimatedMileageCost * 0.20; // 20% de comisión
+                baseCost * 0.20; // 20% de comisión
             final double totalEstimated =
-                estimatedMileageCost + comisionAutoAmigo;
+                baseCost + comisionAutoAmigo;
 
             return Container(
               decoration: const BoxDecoration(
@@ -365,104 +467,6 @@ class RentarAutoScreen extends StatelessWidget {
 
                     const SizedBox(height: 24),
                     const Text(
-                      'Distancia estimada',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF263238),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Ajusta los kilómetros que calculas recorrer para estimar tu pago final.',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        activeTrackColor: const Color(0xFF1565C0),
-                        thumbColor: const Color(0xFF1565C0),
-                        overlayColor: const Color(
-                          0xFF1565C0,
-                        ).withValues(alpha: 0.2),
-                        valueIndicatorTextStyle: const TextStyle(
-                          color: Colors.white,
-                        ),
-                      ),
-                      child: Slider(
-                        value: kmEstimados.clamp(10.0, (300 * days).toDouble()),
-                        min: 10,
-                        max: (300 * days).toDouble(),
-                        divisions: ((300 * days) / 10).round() > 0
-                            ? ((300 * days) / 10).round()
-                            : 1,
-                        label: '${kmEstimados.toInt()} km',
-                        onChanged: (value) {
-                          setState(() {
-                            kmEstimados = value;
-                            kmController.text = value.toInt().toString();
-                          });
-                        },
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          '~ ',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1565C0),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 80,
-                          child: TextField(
-                            controller: kmController,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1565C0),
-                            ),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 8),
-                              enabledBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.grey),
-                              ),
-                              focusedBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Color(0xFF1565C0),
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            onChanged: (val) {
-                              if (val.isEmpty) return;
-                              final double? parsed = double.tryParse(val);
-                              if (parsed != null) {
-                                setState(() {
-                                  kmEstimados = parsed;
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                        const Text(
-                          ' km',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1565C0),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 24),
-                    const Text(
                       'Desglose de pago',
                       style: TextStyle(
                         fontSize: 18,
@@ -474,8 +478,8 @@ class RentarAutoScreen extends StatelessWidget {
 
                     // Desglose de precios
                     _buildPriceRow(
-                      'Estimado por uso (~${kmEstimados.toInt()} km)',
-                      '\$${estimatedMileageCost.toStringAsFixed(2)}',
+                      'Tarifa diaria ($days días)',
+                      '\$${baseCost.toStringAsFixed(2)}',
                     ),
                     const SizedBox(height: 12),
                     _buildPriceRow(
@@ -511,7 +515,7 @@ class RentarAutoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '* El costo final dependerá de los kilómetros reales recorridos a \$${pricePerKm.toStringAsFixed(2)}/km.',
+                      '* El precio está basado en los días de renta seleccionados.',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -576,13 +580,24 @@ class RentarAutoScreen extends StatelessWidget {
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: () => _solicitarRenta(
-                          context,
-                          picked.start,
-                          picked.end,
-                          totalEstimated,
-                          metodoPago,
-                        ),
+                        onPressed: () async {
+                          if (metodoPago == 'Tarjeta') {
+                            await _iniciarPagoStripe(
+                              context,
+                              picked.start,
+                              picked.end,
+                              totalEstimated,
+                            );
+                          } else {
+                            _solicitarRenta(
+                              context,
+                              picked.start,
+                              picked.end,
+                              totalEstimated,
+                              metodoPago,
+                            );
+                          }
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1565C0),
                           shape: RoundedRectangleBorder(
@@ -823,7 +838,7 @@ class RentarAutoScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              '\$$pricePerKm',
+                              '\$$pricePerDay',
                               style: const TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
@@ -831,7 +846,7 @@ class RentarAutoScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              'MXN / km',
+                              'MXN / día',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -866,107 +881,150 @@ class RentarAutoScreen extends StatelessWidget {
                             ownerData?['fullName'] as String? ??
                             'Usuario AutoAmigo';
 
-                        // Rating simulado para la demo
-                        const rating = 4.8;
-                        const reviews = 124;
-
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
                           return _buildOwnerSkeleton();
                         }
 
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withValues(alpha: 0.05),
-                                blurRadius: 15,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              // Avatar Owner
-                              Container(
-                                height: 60,
-                                width: 60,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.blue[100],
-                                  image: const DecorationImage(
-                                    // Placeholder image de perfil
-                                    image: NetworkImage(
-                                      'https://i.pravatar.cc/150?img=11',
-                                    ),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                child: Align(
-                                  alignment: Alignment.bottomRight,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.verified,
-                                      size: 16,
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              // Info Owner
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      fullName.isNotEmpty
-                                          ? fullName
-                                          : 'Cargando...',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF263238),
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(carData['userId'])
+                              .collection('reviews')
+                              .where('roleEvaluated', isEqualTo: 'owner')
+                              .snapshots(),
+                          builder: (context, reviewSnapshot) {
+                            double average = 0.0;
+                            int total = 0;
+                            if (reviewSnapshot.hasData) {
+                              final docs = reviewSnapshot.data!.docs;
+                              total = docs.length;
+                              if (total > 0) {
+                                double sum = 0;
+                                for (var doc in docs) {
+                                  final data = doc.data() as Map<String, dynamic>;
+                                  sum += (data['rating'] as num?)?.toDouble() ?? 0.0;
+                                }
+                                average = sum / total;
+                              }
+                            }
+                            final String displayRating = total > 0 ? average.toStringAsFixed(1) : 'Nuevo';
+                            final String reviewsText = total > 0 ? ' ($total reseñas)' : '';
+
+                            return InkWell(
+                              onTap: () {
+                                if (ownerData != null && carData['userId'] != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ResenasUsuarioScreen(
+                                        userId: carData['userId'],
+                                        role: 'owner',
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.star,
-                                          size: 16,
-                                          color: Colors.amber,
+                                  );
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.grey.withValues(alpha: 0.05),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Avatar Owner
+                                    Container(
+                                      height: 60,
+                                      width: 60,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.blue[100],
+                                        image: const DecorationImage(
+                                          // Placeholder image de perfil
+                                          image: NetworkImage(
+                                            'https://i.pravatar.cc/150?img=11',
+                                          ),
+                                          fit: BoxFit.cover,
                                         ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '$rating',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
+                                      ),
+                                      child: Align(
+                                        alignment: Alignment.bottomRight,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.verified,
+                                            size: 16,
+                                            color: Colors.blue,
                                           ),
                                         ),
-                                        Text(
-                                          ' ($reviews reseñas)',
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    // Info Owner
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            fullName.isNotEmpty
+                                                ? fullName
+                                                : 'Cargando...',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF263238),
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.star,
+                                                size: 16,
+                                                color: Colors.amber,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                displayRating,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              Text(
+                                                reviewsText,
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.chevron_right,
+                                      color: Colors.grey,
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
+                            );
+                          },
                         );
                       },
                     ),

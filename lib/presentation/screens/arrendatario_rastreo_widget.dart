@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:io' show Platform;
 
 // Tracker global para mantener viva la conexión aunque salgamos de la pantalla
 class RentalLocationTracker {
@@ -134,10 +135,58 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
 
     setState(() => _isTracking = true);
 
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 10, // Actualiza solo si se mueve 10 metros
-    );
+    try {
+      final doc = await FirebaseFirestore.instance.collection('rentals').doc(widget.rentalId).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        final ownerId = data['ownerId'];
+        final brand = data['carBrand'] ?? '';
+        final model = data['carModel'] ?? '';
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(ownerId)
+            .collection('notifications')
+            .add({
+          'title': '🚗 ¡Viaje Iniciado! ($brand $model)',
+          'body': 'El arrendatario ha encendido su vehículo y comenzó la transmisión del GPS en tiempo real. Ya puedes ver su ubicación.',
+          'type': 'trip_started',
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'rentalId': widget.rentalId,
+        });
+      }
+    } catch (e) {
+      debugPrint('Error enviando notificación del viaje: $e');
+    }
+
+    LocationSettings locationSettings;
+
+    if (Platform.isAndroid) {
+      locationSettings = AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+        // Configuración para que el servicio corra en background sin que el celular lo mate
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationText: "Seguimiento de GPS activo en segundo plano",
+          notificationTitle: "Viaje en curso (AutoAmigo)",
+          enableWakeLock: true,
+        ),
+      );
+    } else if (Platform.isIOS || Platform.isMacOS) {
+      locationSettings = AppleSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+        activityType: ActivityType.automotiveNavigation,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+    } else {
+      locationSettings = const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      );
+    }
 
     Position? lastPosition;
 
@@ -180,12 +229,7 @@ class _ArrendatarioRastreoWidgetState extends State<ArrendatarioRastreoWidget> {
     RentalLocationTracker.startTracking(widget.rentalId, stream);
   }
 
-  void _stopTracking() {
-    RentalLocationTracker.stopTracking(widget.rentalId);
-    if (mounted) {
-      setState(() => _isTracking = false);
-    }
-  }
+  // Se borró _stopTracking inutilizado.
 
   @override
   Widget build(BuildContext context) {

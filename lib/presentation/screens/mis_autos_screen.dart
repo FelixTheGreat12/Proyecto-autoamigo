@@ -3,10 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 // Asegúrate de importar tu pantalla de producto
 import 'product_car_screen.dart';
+import 'ver_documentos_auto_screen.dart'; // Importado para visualizar los documentos
 import '../widgets/car_image_loader.dart';
 
 class MisAutosScreen extends StatelessWidget {
-  const MisAutosScreen({super.key});
+  final bool isForDocuments;
+
+  const MisAutosScreen({super.key, this.isForDocuments = false});
 
   @override
   Widget build(BuildContext context) {
@@ -23,9 +26,9 @@ class MisAutosScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: const Text(
-          'Mis Autos',
-          style: TextStyle(
+        title: Text(
+          isForDocuments ? 'Documentos de mis autos' : 'Mis Autos',
+          style: const TextStyle(
             color: Color(0xFF1565C0),
             fontWeight: FontWeight.bold,
           ),
@@ -34,17 +37,18 @@ class MisAutosScreen extends StatelessWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.add_circle_outline,
-              color: Color(0xFF1565C0),
-              size: 28,
+          if (!isForDocuments)
+            IconButton(
+              icon: const Icon(
+                Icons.add_circle_outline,
+                color: Color(0xFF1565C0),
+                size: 28,
+              ),
+              tooltip: 'Agregar auto',
+              onPressed: () {
+                Navigator.pushNamed(context, '/cotizar_auto');
+              },
             ),
-            tooltip: 'Agregar auto',
-            onPressed: () {
-              Navigator.pushNamed(context, '/cotizar_auto');
-            },
-          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -155,15 +159,29 @@ class MisAutosScreen extends StatelessWidget {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProductCarScreen(
-                            autoId: autoId,
-                            carData: autoData,
+                      if (isForDocuments) {
+                        // Navegar a la pantalla de visualización donde solo se leen los PDFs/Imágenes
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VerDocumentosAutoScreen(
+                              autoId: autoId,
+                              brand: brand,
+                              model: model,
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProductCarScreen(
+                              autoId: autoId,
+                              carData: autoData,
+                            ),
+                          ),
+                        );
+                      }
                     },
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -210,21 +228,21 @@ class MisAutosScreen extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    if (autoData['pricePerKm'] != null) ...[
+                                    if (autoData['pricePerDay'] != null) ...[
                                       Icon(
                                         Icons.attach_money,
                                         size: 14,
                                         color: Colors.green[700],
                                       ),
                                       Text(
-                                        '${autoData['pricePerKm']}/km',
+                                        '${autoData['pricePerDay']}/día',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.green[700],
                                         ),
                                       ),
-                                    ] else if (autoData['pricePerDay'] !=
+                                    ] else if (autoData['pricePerKm'] !=
                                         null) ...[
                                       Icon(
                                         Icons.attach_money,
@@ -232,7 +250,7 @@ class MisAutosScreen extends StatelessWidget {
                                         color: Colors.green[700],
                                       ),
                                       Text(
-                                        '${autoData['pricePerDay']}/km (legado)',
+                                        '${autoData['pricePerKm']}/día (legado)',
                                         style: TextStyle(
                                           color: Colors.green[800],
                                           fontSize: 14,

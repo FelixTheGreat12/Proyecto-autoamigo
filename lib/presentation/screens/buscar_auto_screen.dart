@@ -19,7 +19,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
 
   // Filtros seleccionados
   String? _selectedBrand;
-  RangeValues _priceRange = const RangeValues(0, 30);
+  RangeValues _priceRange = const RangeValues(0, 2000);
   
   // Ubicación y distancias
   Position? _currentPosition;
@@ -41,7 +41,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
 
   double _calculateSimulatedPrice(String autoId) {
     final randomHash = autoId.hashCode;
-    return (500 + (randomHash % 2000).abs()).toDouble();
+    return (350 + (randomHash % 1650).abs()).toDouble(); // ~ $350 - $2000 MXN en Zacatecas
   }
 
   @override
@@ -286,6 +286,10 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
           // Mostrar solo "registrado" o "ocupado"
           if (status != 'registrado' && status != 'ocupado') return false;
 
+          // Mostrar solo autos con tarifa diaria definida.
+          // Esto evita que aparezcan tarjetas con esquema legado por km.
+          if (data['pricePerDay'] == null) return false;
+
           final brand = (data['brand'] ?? '').toString();
           final model = (data['model'] ?? '').toString();
 
@@ -300,15 +304,9 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
               _selectedBrand == null ||
               brand.toLowerCase() == _selectedBrand!.toLowerCase();
 
-          // Filtro de precio por km
+          // Filtro de precio por día
           double price = 0;
-          if (data['pricePerKm'] != null) {
-            price = (data['pricePerKm'] as num).toDouble();
-          } else if (data['pricePerDay'] != null) {
-            price = (data['pricePerDay'] as num).toDouble();
-          } else {
-            price = _calculateSimulatedPrice(doc.id) / 100; //Fallback ajustado
-          }
+          price = (data['pricePerDay'] as num).toDouble();
 
           final matchesPrice =
               price >= _priceRange.start && price <= _priceRange.end;
@@ -385,11 +383,9 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
     final model = data['model'] ?? 'Modelo';
     final year = data['year']?.toString() ?? 'N/A';
 
-    // Usaremos el precio real por km, o un fallback ajustado a km
+    // Usaremos el precio real por día, o un fallback ajustado
     double actualPrice = 0;
-    if (data['pricePerKm'] != null) {
-      actualPrice = (data['pricePerKm'] as num).toDouble();
-    } else if (data['pricePerDay'] != null) {
+    if (data['pricePerDay'] != null) {
       actualPrice = (data['pricePerDay'] as num).toDouble();
     } else {
       actualPrice = _calculateSimulatedPrice(autoId) / 100;
@@ -408,7 +404,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
             builder: (context) => RentarAutoScreen(
               autoId: autoId,
               carData: data,
-              pricePerKm: actualPrice.toDouble(),
+              pricePerDay: actualPrice.toDouble(),
             ),
           ),
         );
@@ -486,7 +482,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '\$${actualPrice.toStringAsFixed(2)} / km',
+                            '\$${actualPrice.toStringAsFixed(2)} / día',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -620,9 +616,9 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // --- FILTRO PRECIO POR KM ---
+                    // --- FILTRO PRECIO POR DÍA ---
                     const Text(
-                      'Rango de Precio Máximo (por km)',
+                      'Rango de Precio Máximo (por día)',
                       style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF455A64)),
                     ),
                     const SizedBox(height: 10),
@@ -642,8 +638,8 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
                     RangeSlider(
                       values: tempRange,
                       min: 0,
-                      max: 30, // Precio de hasta 30 pesos por km
-                      divisions: 30,
+                      max: 2000,
+                      divisions: 20,
                       activeColor: const Color(0xFF1565C0),
                       labels: RangeLabels(
                         '\$${tempRange.start.round()}',

@@ -5,8 +5,13 @@ import 'package:flutter/material.dart';
 import 'buscar_auto_screen.dart';
 import 'rentar_auto_screen.dart';
 import 'subir_documentos_usuario_screen.dart';
+import 'historial_rentas_propietario_screen.dart';
+import 'rentas_activas_propietario_screen.dart';
+import 'mis_autos_screen.dart'; // Importado para "Mis doc."
 
+import '../../services/push_notification_service.dart';
 import '../widgets/car_image_loader.dart';
+import 'notificaciones_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +29,9 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
+    // Inicializar y obtener token de notificaciones FCM
+    PushNotificationService.init();
+
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       setState(() {
@@ -201,6 +209,57 @@ class _HomeScreenState extends State<HomeScreen>
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const NotificacionesScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.notifications_none, color: Color(0xFF1565C0)),
+                  tooltip: 'Notificaciones',
+                ),
+                if (_authService.currentUser != null)
+                  Positioned(
+                    right: 12,
+                    top: 12,
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(_authService.currentUser!.uid)
+                          .collection('notifications')
+                          .where('isRead', isEqualTo: false)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                          return Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${snapshot.data!.docs.length}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
             child: IconButton(
               onPressed: () {
                 Navigator.pushNamed(context, '/perfil');
@@ -229,8 +288,6 @@ class _HomeScreenState extends State<HomeScreen>
 
           // Pestaña Arrendador (Menú de gestión)
           _buildRoleView(
-            roleTitle: 'Arrendador',
-            roleSubtitle: 'Administra tu flota y ganancias',
             items: [
               _buildMenuItem(
                 icon: Icons.directions_car_filled_outlined,
@@ -244,26 +301,44 @@ class _HomeScreenState extends State<HomeScreen>
               _buildMenuItem(
                 icon: Icons.business_center_outlined,
                 title: 'Mis doc.',
-                subtitle: 'Documentos propietario',
+                subtitle: 'Documentos del propietario',
                 color: Colors.teal,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MisAutosScreen(isForDocuments: true),
+                    ),
+                  );
+                },
               ),
               _buildMenuItem(
-                icon: Icons.analytics_outlined,
-                title: 'Ganancias',
-                subtitle: 'Reporte ingresos',
-                color: Colors.green,
+                icon: Icons.car_rental,
+                title: 'Solicitudes',
+                subtitle: 'Rentas activas',
+                color: Colors.orangeAccent,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RentasActivasPropietarioScreen(),
+                    ),
+                  );
+                },
               ),
               _buildMenuItem(
                 icon: Icons.history_rounded,
                 title: 'Historial',
-                subtitle: 'Rentas activas',
+                subtitle: 'Historial finalizadas',
                 color: Colors.purpleAccent,
-              ),
-              _buildMenuItem(
-                icon: Icons.notifications_active_outlined,
-                title: 'Avisos',
-                subtitle: 'Solicitudes',
-                color: Colors.redAccent,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HistorialRentasPropietarioScreen(),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -331,36 +406,6 @@ class _HomeScreenState extends State<HomeScreen>
         // Banner de aviso de documentos faltantes
         _buildMissingDocumentsBanner(),
 
-        // Banner de bienvenida ARRENDATARIO
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(30),
-              bottomRight: Radius.circular(30),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bienvenido, Arrendatario',
-                style: TextStyle(color: Colors.grey[600], fontSize: 16),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Encuentra tu auto ideal',
-                style: TextStyle(
-                  color: Color(0xFF263238),
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
         const SizedBox(height: 20),
 
         // Lista de Autos disponibles
@@ -426,16 +471,13 @@ class _HomeScreenState extends State<HomeScreen>
 
                   // Price from database (checking new format first)
                   double rawPrice = 0.0;
-                  if (data['pricePerKm'] != null) {
-                    rawPrice = (data['pricePerKm'] as num).toDouble();
-                  } else if (data['pricePerDay'] != null) {
+                  if (data['pricePerDay'] != null) {
                     rawPrice = (data['pricePerDay'] as num).toDouble();
+                  } else if (data['pricePerKm'] != null) {
+                    rawPrice = (data['pricePerKm'] as num).toDouble();
                   } else {
                     final random = Random(autoId.hashCode);
-                    rawPrice =
-                        4.5 +
-                        (random.nextInt(500) /
-                            100); // Fallback para datos viejos
+                    rawPrice = 350.0 + (random.nextInt(400)); // Fallback aproximado a Zacatecas
                   }
                   final bool isInt = rawPrice == rawPrice.roundToDouble();
                   final String price = isInt
@@ -470,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen>
                             builder: (context) => RentarAutoScreen(
                               autoId: autoId,
                               carData: data,
-                              pricePerKm:
+                                pricePerDay:
                                   rawPrice, // Pasar el precio float directamente
                             ),
                           ),
@@ -557,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen>
                                       ),
                                     ),
                                     Text(
-                                      'por km',
+                                        'por día',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey[600],
@@ -582,8 +624,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildRoleView({
-    required String roleTitle,
-    required String roleSubtitle,
     required List<Widget> items,
   }) {
     return Column(
@@ -592,36 +632,6 @@ class _HomeScreenState extends State<HomeScreen>
         // Banner de aviso de documentos faltantes
         _buildMissingDocumentsBanner(),
 
-        // Banner de bienvenida específico por rol
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(30),
-              bottomRight: Radius.circular(30),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bienvenido, $roleTitle',
-                style: TextStyle(color: Colors.grey[600], fontSize: 16),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                roleSubtitle,
-                style: const TextStyle(
-                  color: Color(0xFF263238),
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
         const SizedBox(height: 20),
         // Grid de opciones
         Expanded(
@@ -631,7 +641,7 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 1.1,
+              childAspectRatio: 0.95, // Más altura para permitir dos líneas de texto
               children: items,
             ),
           ),
@@ -699,8 +709,8 @@ class _HomeScreenState extends State<HomeScreen>
                 Text(
                   subtitle,
                   style: TextStyle(fontSize: 12.0, color: Colors.grey[600]),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  overflow: TextOverflow.visible,
                 ),
               ],
             ),

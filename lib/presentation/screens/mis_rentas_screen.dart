@@ -6,6 +6,44 @@ import 'detalle_renta_arrendatario_screen.dart';
 class MisRentasScreen extends StatelessWidget {
   const MisRentasScreen({super.key});
 
+  Future<void> _deleteRental(BuildContext context, String rentalId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar del Historial'),
+        content: const Text('¿Estás seguro de que deseas eliminar este registro permanentemente?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('rentals').doc(rentalId).delete();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registro eliminado.'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -180,8 +218,22 @@ class MisRentasScreen extends StatelessWidget {
                             ],
                           ),
                         ),
-                        // Status Badge
-                        _buildStatusBadge(status),
+                        // Status Badge and Delete
+                        Column(
+                          children: [
+                            _buildStatusBadge(status),
+                            if (status == 'completed' || status == 'rejected' || status == 'cancelled' || status == 'finalizado') ...[
+                              const SizedBox(height: 8),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                tooltip: 'Eliminar del historial',
+                                onPressed: () {
+                                  _deleteRental(context, rentalId);
+                                },
+                              ),
+                            ]
+                          ],
+                        ),
                       ],
                     ),
                   ),

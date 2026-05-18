@@ -233,7 +233,7 @@ class ProductCarScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: ClipRRect(
+              child: ClipRRect( 
                 borderRadius: BorderRadius.circular(16),
                 child: CarImageLoader(
                   autoId: autoId,
@@ -283,19 +283,19 @@ class ProductCarScreen extends StatelessWidget {
                   _buildInfoRow(Icons.settings, 'Transmisión', transmission),
                   const Divider(height: 24),
                   _buildInfoRow(Icons.confirmation_number, 'Placas', plate),
-                  if (carData['pricePerKm'] != null) ...[
+                  if (carData['pricePerDay'] != null) ...[
                     const Divider(height: 24),
                     _buildInfoRow(
                       Icons.attach_money,
-                      'Precio por km',
-                      '\$${carData['pricePerKm']} MXN',
-                    ),
-                  ] else if (carData['pricePerDay'] != null) ...[
-                    const Divider(height: 24),
-                    _buildInfoRow(
-                      Icons.attach_money,
-                      'Precio por km (Legado)',
+                      'Precio por día',
                       '\$${carData['pricePerDay']} MXN',
+                    ),
+                  ] else if (carData['pricePerKm'] != null) ...[
+                    const Divider(height: 24),
+                    _buildInfoRow(
+                      Icons.attach_money,
+                      'Precio por día (dato legado)',
+                      '\$${carData['pricePerKm']} MXN',
                     ),
                   ],
                 ],

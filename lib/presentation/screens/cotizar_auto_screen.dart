@@ -77,9 +77,12 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     return brandsWithModels[selectedBrand] ?? [];
   }
 
+  double _baseDailyPrice = 350.0; // Se llenará desde Firebase si existe
+
   @override
   void initState() {
     super.initState();
+    _loadVariablesFromFirebase();
     // SI ESTAMOS EN MODO EDICIÓN: Pre-llenar los campos
     if (widget.existingData != null) {
       selectedYear = widget.existingData!['year'];
@@ -89,11 +92,28 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
       selectedTransmission = widget.existingData!['transmission'];
       selectedEngine = widget.existingData!['engine'];
       _plateController.text = widget.existingData!['plate'] ?? '';
-      if (widget.existingData!['pricePerKm'] != null) {
-        _priceController.text = widget.existingData!['pricePerKm'].toString();
-      } else if (widget.existingData!['pricePerDay'] != null) {
+      if (widget.existingData!['pricePerDay'] != null) {
         _priceController.text = widget.existingData!['pricePerDay'].toString();
+      } else if (widget.existingData!['pricePerKm'] != null) {
+        _priceController.text = widget.existingData!['pricePerKm'].toString();
       }
+    }
+  }
+
+  Future<void> _loadVariablesFromFirebase() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('system_settings').doc('variables').get();
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && data['deliveryFee'] != null) {
+          // Usamos la tarifa de entrega o una propina base como cálculo de partida si quieres
+          setState(() {
+            _baseDailyPrice = (data['deliveryFee'] as num).toDouble() * 2; // Por ejemplo, 2 tarifas base
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error leyendo configuraciones: \$e');
     }
   }
 
@@ -487,7 +507,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
   }
 
   Widget _buildPriceInput() {
-    final double suggestedPrice = _getSuggestedPricePerKm();
+    final double suggestedPrice = _getSuggestedPricePerDay();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,8 +520,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
             FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
           ],
           decoration: InputDecoration(
-            labelText: 'Tarifa por km (MXN)',
-            hintText: 'Ej. 4.50',
+            labelText: 'Tarifa por día (MXN)',
+            hintText: 'Ej. 650.00',
             prefixIcon: const Icon(Icons.attach_money),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(
@@ -522,7 +542,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  'Sugerido: \$${suggestedPrice.toStringAsFixed(2)} / km',
+                  'Sugerido: \$${suggestedPrice.toStringAsFixed(0)} / día',
                   style: TextStyle(
                     color: Colors.grey[700],
                     fontSize: 12,
@@ -533,7 +553,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                 GestureDetector(
                   onTap: () {
                     setState(() {
-                      _priceController.text = suggestedPrice.toStringAsFixed(2);
+                      _priceController.text = suggestedPrice.toStringAsFixed(0);
                     });
                   },
                   child: const Text(
@@ -552,50 +572,32 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     );
   }
 
-  double _getSuggestedPricePerKm() {
-    if (selectedEngine == null) return 0.0;
+  double _getSuggestedPricePerDay() {
+    if (selectedEngine == null) return _baseDailyPrice;
 
-    double gasPrice = 25.0; // Precio gasolina estimado mxn
-    double gasCostPerKm = 0.0;
-    double maintenancePerKm = 1.0;
-    double ownerProfitPerKm = 2.0;
+    double basePerDay = _baseDailyPrice; // Precio base usando Firebase
 
     switch (selectedEngine) {
       case '1.0L - 1.2L':
-        gasCostPerKm = gasPrice / 18.0;
-        maintenancePerKm = 0.8;
+        basePerDay = basePerDay * 1.0;
         break;
       case '1.4L - 1.5L':
-        gasCostPerKm = gasPrice / 15.0;
-        maintenancePerKm = 0.9;
+        basePerDay = basePerDay * 1.2;
         break;
       case '1.6L - 1.8L':
-        gasCostPerKm = gasPrice / 13.0;
-        maintenancePerKm = 1.0;
+        basePerDay = basePerDay * 1.5;
         break;
       case '2.0L - 2.4L':
-        gasCostPerKm = gasPrice / 11.0;
-        maintenancePerKm = 1.2;
+        basePerDay = basePerDay * 2.0;
         break;
       case '2.5L - 2.9L':
-        gasCostPerKm = gasPrice / 9.0;
-        maintenancePerKm = 1.5;
+        basePerDay = basePerDay * 2.5;
         break;
       case '3.0L o más':
-        gasCostPerKm = gasPrice / 7.0;
-        maintenancePerKm = 1.8;
+        basePerDay = basePerDay * 3.0;
         break;
       default:
-        gasCostPerKm = gasPrice / 13.0;
-    }
-
-    // Extra ganancia por año del auto
-    if (selectedYear != null) {
-      int year = int.tryParse(selectedYear!) ?? 2015;
-      if (year >= 2024)
-        ownerProfitPerKm += 1.0;
-      else if (year >= 2021)
-        ownerProfitPerKm += 0.5;
+        basePerDay = basePerDay * 1.2;
     }
 
     // Extra ganancia por segmento (Sedan mediano/SUV vs Compacto)
@@ -608,11 +610,11 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
         'Focus',
         'Avanza',
       ].contains(selectedModel)) {
-        ownerProfitPerKm += 0.5;
+        basePerDay += 100.0;
       }
     }
 
-    return gasCostPerKm + maintenancePerKm + ownerProfitPerKm;
+    return basePerDay;
   }
 
   Future<void> _saveOrUpdateAuto() async {
@@ -647,8 +649,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
       return;
     }
 
-    final double? pricePerKm = double.tryParse(_priceController.text.trim());
-    if (pricePerKm == null || pricePerKm <= 0) {
+    final double? pricePerDay = double.tryParse(_priceController.text.trim());
+    if (pricePerDay == null || pricePerDay <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Por favor ingresa un precio válido mayor a 0'),
@@ -682,7 +684,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
         'transmission': selectedTransmission,
         'engine': selectedEngine,
         'plate': _plateController.text.trim().toUpperCase(),
-        'pricePerKm': pricePerKm,
+        'pricePerDay': pricePerDay,
         'userId': userId,
       };
 
