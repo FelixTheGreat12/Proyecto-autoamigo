@@ -217,41 +217,61 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo / Icono principal
+                // Logo AutoAmigo mejorado
                 Container(
-                  padding: const EdgeInsets.all(15),
+                  height: 120,
+                  width: 120,
                   decoration: BoxDecoration(
-                    color: Colors.white,
                     shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF0D47A1),
+                        const Color(0xFF1565C0),
+                      ],
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: const Color(0xFF0D47A1).withOpacity(0.3),
                         blurRadius: 20,
                         spreadRadius: 5,
                       ),
                     ],
                   ),
-                  child: Icon(
-                    Icons.directions_car_filled_rounded,
-                    size: 50,
-                    color: const Color(0xFF0D47A1),
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.directions_car_filled_rounded,
+                          size: 60,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                SizedBox(height: 10),
-                Text(
+                const SizedBox(height: 24),
+                const Text(
                   "AutoAmigo",
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF0D47A1),
+                    color: Color(0xFF0D47A1),
+                    letterSpacing: 0.5,
                   ),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 8),
                 Text(
                   "Tu compañero en el camino",
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 32),
 
                 // Tarjeta de Login
                 Container(
