@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'calificar_viaje_screen.dart';
 import 'pdf_viewer_screen.dart';
 import 'rastreo_auto_propietario_screen.dart';
 
@@ -53,6 +58,85 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
       debugPrint('Error getting tenant documents: $e');
     }
     return null;
+  }
+
+  Future<void> _fetchAndShowContract() async {
+    try {
+      final storageUrl = await FirebaseStorage.instance
+          .ref('global_contracts/contracto_global.pdf')
+          .getDownloadURL();
+      
+      final Uri url = Uri.parse(storageUrl);
+      if (Platform.isAndroid) {
+        final Uri chromeUrl = Uri.parse(
+          'googlechrome://navigate?url=${Uri.encodeComponent(storageUrl)}',
+        );
+        if (await canLaunchUrl(chromeUrl)) {
+          await launchUrl(chromeUrl, mode: LaunchMode.externalApplication);
+          return;
+        }
+      }
+
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo abrir el enlace.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Aún no hay un contrato global disponible para imprimir.')),
+        );
+      }
+    }
+  }
+
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploadingPhoto = false;
+
+  Future<void> _captureInitialOdometer() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    if (image == null) return;
+
+    if (!mounted) return;
+    setState(() => _isUploadingPhoto = true);
+
+    try {
+      final File file = File(image.path);
+      final String fileName = 'rental_${widget.rentalId}_odometer_start.jpg';
+      final Reference storageRef = FirebaseStorage.instance
+          .ref()
+          .child('rentals_evidence')
+          .child(fileName);
+
+      await storageRef.putFile(file);
+      final String downloadUrl = await storageRef.getDownloadURL();
+
+      await FirebaseFirestore.instance
+          .collection('rentals')
+          .doc(widget.rentalId)
+          .update({'odometerPhotoUrl': downloadUrl});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto de evidencia guardada exitosamente.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al subir foto de evidencia: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingPhoto = false);
+      }
+    }
   }
 
   void _openDocument(BuildContext context, String? url, String title) {
@@ -147,10 +231,29 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
         SnackBar(content: Text(message), backgroundColor: color),
       );
 
-      // Return to the list ONLY if rejected or completed to clean up the flow,
-      // otherwise they stay here to see the next available actions.
-      if (newStatus == 'rejected' || newStatus == 'completed') {
+      // Return to the list ONLY if rejected or cancelled
+      if (newStatus == 'rejected' || newStatus == 'cancelled') {
         Navigator.pop(context);
+        return;
+      }
+      
+      // Mostrar diálogo de recordatorio al aceptar
+      if (newStatus == 'approved' && context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('¡Solicitud Aceptada!'),
+            content: const Text(
+              'Recuerda imprimir el contrato e ir a buscar al usuario para iniciar el viaje y darle el auto.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e) {
       if (!context.mounted) return;
@@ -607,7 +710,8 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           bottomNavigationBar:
               (status == 'pending' ||
                   status == 'approved' ||
-                  status == 'in_progress')
+                  status == 'in_progress' ||
+                  status == 'completed')
               ? _buildActionButtons(context, status)
               : null,
         );
@@ -770,21 +874,123 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           ],
         ),
         child: SafeArea(
-          // Asegurar padding en dispositivos con notch
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: _isUploadingPhoto ? null : _captureInitialOdometer,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF1565C0),
+                    side: const BorderSide(color: Color(0xFF1565C0), width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: _isUploadingPhoto
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.photo_camera_outlined),
+                  label: Text(
+                    _isUploadingPhoto ? 'Subiendo foto...' : 'Tomar foto de odómetro',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _updateStatus(context, 'cancelled'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _confirmDeliveryAndStartRental(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1565C0),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.vpn_key_outlined, color: Colors.white),
+                      label: const Text(
+                        'Confirmar Entrega',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (status == 'completed') {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
           child: SizedBox(
             width: double.infinity,
             height: 50,
             child: ElevatedButton.icon(
-              onPressed: () => _confirmDeliveryAndStartRental(context),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CalificarViajeScreen(
+                      rentalId: widget.rentalId,
+                      targetUserId: widget.tenantId,
+                      role: 'owner',
+                    ),
+                  ),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1565C0),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              icon: const Icon(Icons.vpn_key_outlined, color: Colors.white),
+              icon: const Icon(Icons.star_border, color: Colors.white),
               label: const Text(
-                'Confirmar Entrega y Permiso',
+                'Calificar Usuario',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

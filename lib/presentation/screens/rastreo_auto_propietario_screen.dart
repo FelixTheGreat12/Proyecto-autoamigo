@@ -50,6 +50,12 @@ class _RastreoAutoPropietarioScreenState
           // Extraer precio por KM y distancia guardada (si existe)
           final double pricePerKm = (data['pricePerKm'] ?? data['price'] ?? 0).toDouble();
           final double distancia = (data['distanciaRecorridaKm'] ?? 0).toDouble();
+          
+          // Recuperar kmLimit para calcular el límite de 500km
+          final double kmLimit = (data['kmLimit'] ?? 500).toDouble();
+          final double kmOverage = distancia > kmLimit ? distancia - kmLimit : 0;
+          final double extraKmCharge = kmOverage * pricePerKm;
+          
           final double gananciaAcumulada = distancia * pricePerKm;
 
           // 2. Leemos la ubicación actual subida por el arrendatario
@@ -205,6 +211,84 @@ class _RastreoAutoPropietarioScreenState
                               ),
                             ],
                           ),
+                          if (kmLimit > 0) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: kmOverage > 0 ? Colors.red[50] : Colors.blue[50],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: kmOverage > 0 ? Colors.red[200]! : Colors.blue[200]!,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Límite de KM:',
+                                        style: TextStyle(
+                                          color: kmOverage > 0 ? Colors.red[900] : Colors.blue[900],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${kmLimit.toStringAsFixed(2)} km',
+                                        style: TextStyle(
+                                          color: kmOverage > 0 ? Colors.red[900] : Colors.blue[900],
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (kmOverage > 0) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Exceso:',
+                                          style: TextStyle(
+                                            color: Colors.red[900],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${kmOverage.toStringAsFixed(2)} km',
+                                          style: TextStyle(
+                                            color: Colors.red[900],
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Cargo Extra:',
+                                          style: TextStyle(
+                                            color: Colors.red[900],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          '\$${extraKmCharge.toStringAsFixed(2)} MXN',
+                                          style: TextStyle(
+                                            color: Colors.red[900],
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ],
                     ),
