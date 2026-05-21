@@ -210,10 +210,11 @@ class _HomeScreenState extends State<HomeScreen>
                   ],
                 ),
               ),
-              child: const Icon(
-                Icons.directions_car_filled_rounded,
-                size: 24,
-                color: Colors.white,
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 24,
+                height: 24,
+                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(width: 12),

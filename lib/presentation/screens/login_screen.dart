@@ -206,17 +206,17 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset:
-          false, // Mantiene la pantalla fija, sin scroll al abrir teclado
+      resizeToAvoidBottomInset: true,
       backgroundColor: const Color(0xFFF5F5F5),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Form(
             key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                 // Logo AutoAmigo mejorado
                 Container(
                   height: 120,
@@ -239,16 +239,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.directions_car_filled_rounded,
-                          size: 60,
-                          color: Colors.white,
-                        ),
-                      ],
+                  child: Center(
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 70,
+                      height: 70,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),
@@ -450,7 +446,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
