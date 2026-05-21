@@ -195,38 +195,10 @@ class _HomeScreenState extends State<HomeScreen>
       backgroundColor: const Color(0xFFF5F7FA), // Fondo gris azulado suave
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF0D47A1),
-                    Color(0xFF1565C0),
-                  ],
-                ),
-              ),
-              child: Image.asset(
-                'assets/images/logo.png',
-                width: 24,
-                height: 24,
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'AutoAmigo',
-              style: TextStyle(
-                color: Color(0xFF1565C0),
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-              ),
-            ),
-          ],
+        title: Image.asset(
+          'assets/images/logo.png',
+          height: 45, // Más grande
+          fit: BoxFit.contain,
         ),
         centerTitle: false,
         automaticallyImplyLeading: false,

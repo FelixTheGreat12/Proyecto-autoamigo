@@ -207,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Colors.white, // Fondo blanco para coincidir con el logo
       body: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -217,48 +217,13 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                // Logo AutoAmigo mejorado
-                Container(
-                  height: 120,
-                  width: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFF0D47A1),
-                        const Color(0xFF1565C0),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF0D47A1).withOpacity(0.3),
-                        blurRadius: 20,
-                        spreadRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      width: 70,
-                      height: 70,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+                // Logo AutoAmigo más grande y sin fondo azul
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: 180, // Más zoom
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  "AutoAmigo",
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 Text(
                   "Tu compañero en el camino",
                   style: TextStyle(
@@ -267,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     fontStyle: FontStyle.italic,
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 40),
 
                 // Tarjeta de Login
                 Container(
