@@ -582,6 +582,21 @@ class _DetalleRentaArrendatarioScreenState extends State<DetalleRentaArrendatari
                               '\$$finalTotalPay MXN',
                               color: Colors.teal[800],
                             ),
+                            const SizedBox(height: 8),
+                            _buildDetailRow(
+                              'Depósito de seguridad retenido',
+                              '\$${(currentRentalData['securityDeposit'] ?? 1500).toStringAsFixed(2)} MXN',
+                              color: Colors.orange[800],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '* El depósito se devuelve si no hay daños.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[500],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
                             if (paymentMethod == 'Tarjeta' || paymentMethod == 'Tarjeta (Retenido)') ...[
                               const SizedBox(height: 24),
                               Container(
@@ -812,7 +827,7 @@ class _DetalleRentaArrendatarioScreenState extends State<DetalleRentaArrendatari
                       ),
                     ],
 
-                    if (status != 'completed' && status != 'rejected') ...[
+                    if (status == 'approved' || status == 'in_progress') ...[
                       const SizedBox(height: 24),
                       const Padding(
                         padding: EdgeInsets.only(bottom: 12, left: 4),
@@ -1148,6 +1163,11 @@ class _DetalleRentaArrendatarioScreenState extends State<DetalleRentaArrendatari
                             _buildDetailRow(
                               'Precio acordado',
                               '\$$price MXN / km',
+                            ),
+                            const SizedBox(height: 8),
+                            _buildDetailRow(
+                              'Límite de km incluidos',
+                              '${(currentRentalData['kmLimit'] ?? 500).toStringAsFixed(0)} km',
                             ),
                             if (days > 0) ...[
                               const SizedBox(height: 8),

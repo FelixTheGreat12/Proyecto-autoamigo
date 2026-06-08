@@ -18,6 +18,7 @@ class CotizarAutoScreen extends StatefulWidget {
 class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
   final TextEditingController _plateController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _kmLimitController = TextEditingController(text: '500');
   bool _isSaving = false;
 
   String? selectedYear;
@@ -96,6 +97,9 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
         _priceController.text = widget.existingData!['pricePerDay'].toString();
       } else if (widget.existingData!['pricePerKm'] != null) {
         _priceController.text = widget.existingData!['pricePerKm'].toString();
+      }
+      if (widget.existingData!['kmLimit'] != null) {
+        _kmLimitController.text = widget.existingData!['kmLimit'].toString();
       }
     }
   }
@@ -176,6 +180,8 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                       _buildPlateInput(),
                       const SizedBox(height: 12),
                       _buildPriceInput(),
+                      const SizedBox(height: 12),
+                      _buildKmLimitInput(),
                       const SizedBox(height: 16),
                       _buildCotizarButton(isEditing),
                     ],
@@ -210,8 +216,12 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
                         Expanded(child: _buildPlateInput()),
                         const SizedBox(width: 12),
                         Expanded(child: _buildPriceInput()),
-                        const SizedBox(width: 12),
-                        const Spacer(), // Spacer to balance columns with the row above
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: _buildKmLimitInput()),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -572,6 +582,48 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
     );
   }
 
+  Widget _buildKmLimitInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _kmLimitController,
+          enabled: !_isSaving,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+          ],
+          decoration: InputDecoration(
+            labelText: 'Límite de kilómetros incluidos',
+            hintText: '500',
+            prefixIcon: const Icon(Icons.speed),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6.0, left: 4.0),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, size: 14, color: Colors.blue[400]),
+              const SizedBox(width: 4),
+              Text(
+                'Default: 500 km. Exceso se cobra por km adicional.',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   double _getSuggestedPricePerDay() {
     if (selectedEngine == null) return _baseDailyPrice;
 
@@ -685,6 +737,7 @@ class _CotizarAutoScreenState extends State<CotizarAutoScreen> {
         'engine': selectedEngine,
         'plate': _plateController.text.trim().toUpperCase(),
         'pricePerDay': pricePerDay,
+        'kmLimit': double.tryParse(_kmLimitController.text.trim()) ?? 500.0,
         'userId': userId,
       };
 

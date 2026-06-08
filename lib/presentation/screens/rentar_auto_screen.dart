@@ -42,7 +42,8 @@ class RentarAutoScreen extends StatelessWidget {
     DateTime endDate,
     double total,
     String paymentMethod, {
-    String? paymentIntentId, // Guardamos el ID de referencia del pago con tarjeta
+    String? paymentIntentId,
+    double? securityDepositAmount,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -65,12 +66,14 @@ class RentarAutoScreen extends StatelessWidget {
         'autoId': autoId,
         'tenantId': user.uid,
         'ownerId': carData['userId'],
-        'status': 'pending', // pending, approved, rejected, completed
+        'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
         'pricePerDay': pricePerDay,
         'estimatedTotal': total,
+        'securityDeposit': securityDepositAmount ?? 1500.0,
         'paymentMethod': paymentMethod,
         'stripePaymentIntentId': paymentIntentId,
+        'kmLimit': carData['kmLimit'] ?? 500.0,
         'startDate': startDate.toIso8601String(),
         'endDate': endDate.toIso8601String(),
         'carBrand': carData['brand'],
@@ -157,7 +160,7 @@ class RentarAutoScreen extends StatelessWidget {
     BuildContext context,
     DateTime startDate,
     DateTime endDate,
-    double totalEstimated,
+    double totalWithDeposit,
   ) async {
     try {
       // 1. Mostrar un loader mientras preparamos el pago
@@ -167,14 +170,26 @@ class RentarAutoScreen extends StatelessWidget {
         builder: (c) => const Center(child: CircularProgressIndicator()),
       );
 
-      // 2. Llamar a la Cloud Function para crear el Payment Intent
+      // 2. Leer el depósito de seguridad para guardarlo
+      double securityDepositAmount = 1500.0;
+      try {
+        final settingsDoc = await FirebaseFirestore.instance
+            .collection('system_settings')
+            .doc('variables')
+            .get();
+        if (settingsDoc.exists) {
+          securityDepositAmount = (settingsDoc.data()?['securityDeposit'] ?? 1500).toDouble();
+        }
+      } catch (_) {}
+
+      // 3. Llamar a la Cloud Function para crear el Payment Intent
       final functions = FirebaseFunctions.instance;
       final callable = functions.httpsCallable('createPaymentIntent');
 
       final result = await callable.call({
-        'amount': totalEstimated,
+        'amount': totalWithDeposit,
         'currency': 'mxn',
-        'ownerId': carData['userId'], // Pasamos el dueño para el split de pagos
+        'ownerId': carData['userId'],
       });
 
       final String clientSecret = result.data['clientSecret'];
@@ -210,9 +225,10 @@ class RentarAutoScreen extends StatelessWidget {
           context,
           startDate,
           endDate,
-          totalEstimated,
+          totalWithDeposit,
           'Tarjeta',
           paymentIntentId: paymentIntentId,
+          securityDepositAmount: securityDepositAmount,
         );
       }
 
@@ -244,6 +260,21 @@ class RentarAutoScreen extends StatelessWidget {
   }
 
   void _mostrarCheckoutFront(BuildContext context) async {
+    // 0. Leer el depósito de seguridad desde system_settings
+    double securityDeposit = 1500.0;
+    try {
+      final settingsDoc = await FirebaseFirestore.instance
+          .collection('system_settings')
+          .doc('variables')
+          .get();
+      if (settingsDoc.exists) {
+        final data = settingsDoc.data();
+        securityDeposit = (data?['securityDeposit'] ?? 1500).toDouble();
+      }
+    } catch (e) {
+      debugPrint('Error reading securityDeposit: $e');
+    }
+
     // 1. Mostrar selector de fechas
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
@@ -310,8 +341,10 @@ class RentarAutoScreen extends StatelessWidget {
             final double baseCost = pricePerDay * days;
             final double comisionAutoAmigo =
                 baseCost * 0.20; // 20% de comisión
-            final double totalEstimated =
+            final double totalRenta =
                 baseCost + comisionAutoAmigo;
+            final double totalWithDeposit =
+                totalRenta + securityDeposit;
 
             return Container(
               decoration: const BoxDecoration(
@@ -487,6 +520,12 @@ class RentarAutoScreen extends StatelessWidget {
                       '\$${comisionAutoAmigo.toStringAsFixed(2)}',
                       isFee: true,
                     ),
+                    const SizedBox(height: 12),
+                    _buildPriceRow(
+                      'Depósito de seguridad (se devuelve)',
+                      '\$${securityDeposit.toStringAsFixed(2)}',
+                      isFee: true,
+                    ),
 
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 16.0),
@@ -497,14 +536,14 @@ class RentarAutoScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Estimado a pagar (MXN)',
+                          'Total a Retener en Tarjeta',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          '\$${totalEstimated.toStringAsFixed(2)}',
+                          '\$${totalWithDeposit.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -515,7 +554,7 @@ class RentarAutoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '* El precio está basado en los días de renta seleccionados.',
+                      '* El depósito de seguridad se retiene y se devuelve al finalizar el viaje sin daños.',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -586,14 +625,14 @@ class RentarAutoScreen extends StatelessWidget {
                               context,
                               picked.start,
                               picked.end,
-                              totalEstimated,
+                              totalWithDeposit,
                             );
                           } else {
                             _solicitarRenta(
                               context,
                               picked.start,
                               picked.end,
-                              totalEstimated,
+                              totalRenta,
                               metodoPago,
                             );
                           }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import 'ver_documento_screen.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
@@ -9,21 +12,22 @@ class AdminDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Panel de Administrador'),
-          backgroundColor: const Color(0xFF1565C0),
-          foregroundColor: Colors.white,
-          bottom: const TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(icon: Icon(Icons.settings), text: 'Variables'),
-              Tab(icon: Icon(Icons.block), text: 'Usuarios'),
-              Tab(icon: Icon(Icons.fact_check), text: 'Validar Docs'),
-            ],
-          ),
+        length: 4,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Panel de Administrador'),
+            backgroundColor: const Color(0xFF1565C0),
+            foregroundColor: Colors.white,
+            bottom: const TabBar(
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              tabs: [
+                Tab(icon: Icon(Icons.settings), text: 'Variables'),
+                Tab(icon: Icon(Icons.block), text: 'Usuarios'),
+                Tab(icon: Icon(Icons.fact_check), text: 'Validar Docs'),
+                Tab(icon: Icon(Icons.article), text: 'Contrato'),
+              ],
+            ),
           actions: [
             IconButton(
               icon: const Icon(Icons.logout),
@@ -41,6 +45,7 @@ class AdminDashboardScreen extends StatelessWidget {
             VariablesAdminTab(),
             BloquearUsuariosTab(),
             ValidarDocumentosTab(),
+            ContratoAdminTab(),
           ],
         ),
       ),
@@ -626,6 +631,260 @@ class _ValidarDocumentosTabState extends State<ValidarDocumentosTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ----------------------------------------------------------------------
+// 4. PESTANA: SUBIR CONTRATO GLOBAL
+// ----------------------------------------------------------------------
+class ContratoAdminTab extends StatefulWidget {
+  const ContratoAdminTab({super.key});
+
+  @override
+  State<ContratoAdminTab> createState() => _ContratoAdminTabState();
+}
+
+class _ContratoAdminTabState extends State<ContratoAdminTab> {
+  bool _isUploading = false;
+  String? _currentContractUrl;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCurrentContract();
+  }
+
+  Future<void> _checkCurrentContract() async {
+    try {
+      final url = await FirebaseStorage.instance
+          .ref('global_contracts/contracto_global.pdf')
+          .getDownloadURL();
+      if (mounted) {
+        setState(() {
+          _currentContractUrl = url;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _currentContractUrl = null;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _uploadContract() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = File(result.files.first.path!);
+      if (!mounted) return;
+      setState(() => _isUploading = true);
+
+      final ref = FirebaseStorage.instance
+          .ref('global_contracts/contracto_global.pdf');
+
+      await ref.putFile(file);
+      final url = await ref.getDownloadURL();
+
+      if (mounted) {
+        setState(() {
+          _currentContractUrl = url;
+          _isUploading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Contrato subido exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al subir contrato: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteContract() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar Contrato'),
+        content: const Text('¿Estás seguro de eliminar el contrato actual?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await FirebaseStorage.instance
+          .ref('global_contracts/contracto_global.pdf')
+          .delete();
+      if (mounted) {
+        setState(() => _currentContractUrl = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Contrato eliminado'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Contrato Global',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Este contrato se mostrara a los arrendadores al momento de aceptar una solicitud de renta.',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 24),
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Icon(
+                    _currentContractUrl != null
+                        ? Icons.check_circle
+                        : Icons.article_outlined,
+                    size: 64,
+                    color: _currentContractUrl != null
+                        ? Colors.green
+                        : Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _currentContractUrl != null
+                        ? 'Contrato actual cargado'
+                        : 'No hay contrato cargado',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: _currentContractUrl != null
+                          ? Colors.green[800]
+                          : Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _currentContractUrl != null
+                        ? 'Los arrendadores podran ver e imprimir el contrato.'
+                        : 'Sube un PDF para que los arrendadores puedan ver el contrato.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: _isUploading ? null : _uploadContract,
+              icon: _isUploading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.upload_file),
+              label: Text(
+                _isUploading
+                    ? 'Subiendo...'
+                    : _currentContractUrl != null
+                        ? 'Actualizar Contrato'
+                        : 'Subir Contrato (PDF)',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1565C0),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          if (_currentContractUrl != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: _deleteContract,
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                label: const Text(
+                  'Eliminar Contrato',
+                  style: TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

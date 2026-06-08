@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'calificar_viaje_screen.dart';
 import 'pdf_viewer_screen.dart';
 import 'rastreo_auto_propietario_screen.dart';
+import 'resenas_usuario_screen.dart';
 
 class DetalleSolicitudScreen extends StatefulWidget {
   final String rentalId;
@@ -26,6 +28,8 @@ class DetalleSolicitudScreen extends StatefulWidget {
 }
 
 class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
+  bool _hasShownRatingDialog = false;
+
   Future<Map<String, dynamic>?> _getTenantData() async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -171,10 +175,26 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           pricePerKm != null) {
         final double basePay = finalDistance * pricePerKm;
         final double commission = basePay * 0.20;
+        final double finalTotal = basePay + commission;
         
         updates['finalBasePay'] = basePay;
         updates['finalCommission'] = commission;
-        updates['finalTotalPay'] = basePay + commission;
+        updates['finalTotalPay'] = finalTotal;
+
+        // Capturar el pago real en Stripe (solo lo consumido, el deposito se libera)
+        final String paymentId = widget.rentalData['stripePaymentIntentId'] ?? '';
+        if (paymentId.isNotEmpty) {
+          try {
+            final functions = FirebaseFunctions.instance;
+            final callable = functions.httpsCallable('capturePayment');
+            await callable.call({
+              'paymentIntentId': paymentId,
+              'finalAmount': finalTotal,
+            });
+          } catch (e) {
+            debugPrint('Error al capturar pago en Stripe: $e');
+          }
+        }
       }
 
       await FirebaseFirestore.instance
@@ -434,6 +454,90 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
             ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
             : "N/A";
 
+        if (status == 'completed' &&
+            currentRentalData['tenantRating'] == null &&
+            !_hasShownRatingDialog) {
+          _hasShownRatingDialog = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            showDialog(
+              context: context,
+              barrierDismissible: true,
+              builder: (ctx) => Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.verified,
+                        color: Colors.green,
+                        size: 64,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        '¡Viaje Finalizado!',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF263238),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Por favor califica al arrendatario para ayudar a la comunidad.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF546E7A),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => CalificarViajeScreen(
+                                  rentalId: widget.rentalId,
+                                  targetUserId: widget.tenantId,
+                                  role: 'tenant',
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1565C0),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text('Calificar ahora'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          'Calificar más tarde',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          });
+        }
+
         return Scaffold(
           backgroundColor: const Color(0xFFF5F7FA),
           appBar: AppBar(
@@ -547,6 +651,11 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                             ),
                             const Divider(),
                             _buildDetailRow('Precio por km', '\$$price MXN'),
+                            const Divider(),
+                            _buildDetailRow(
+                              'Límite de km incluidos',
+                              '${(currentRentalData['kmLimit'] ?? widget.rentalData['kmLimit'] ?? 500).toStringAsFixed(0)} km',
+                            ),
                             if (days > 0) ...[
                               const Divider(),
                               _buildDetailRow(
@@ -604,6 +713,178 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                         ),
                       ),
                     ),
+
+                    // FOTO DEL ODÓMETRO (visible en in_progress y completed)
+                    if (status == 'in_progress' || status == 'completed') ...[
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Foto del Odómetro'),
+                      Builder(
+                        builder: (context) {
+                          final odometerUrl =
+                              currentRentalData['odometerPhotoUrl']
+                                  ?.toString();
+                          if (odometerUrl == null ||
+                              odometerUrl.isEmpty) {
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius:
+                                    BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.speed,
+                                    color: Colors.grey,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      status == 'in_progress'
+                                          ? 'El propietario aún no ha tomado la foto del odómetro.'
+                                          : 'No se registró foto de odómetro.',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      PDFViewerScreen(
+                                        url: odometerUrl,
+                                        title:
+                                            'Foto del Odómetro',
+                                      ),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius:
+                                    BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.blue[200]!,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.blue
+                                        .withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset:
+                                        const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius:
+                                    BorderRadius.circular(16),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width:
+                                          double.infinity,
+                                      height: 200,
+                                      decoration:
+                                          BoxDecoration(
+                                        color: Colors
+                                            .grey[200],
+                                      ),
+                                      child:
+                                          Image.network(
+                                            odometerUrl,
+                                            fit: BoxFit
+                                                .cover,
+                                            loadingBuilder:
+                                                (
+                                                  context,
+                                                  child,
+                                                  loadingProgress,
+                                                ) {
+                                                  if (loadingProgress ==
+                                                      null)
+                                                    return child;
+                                                  return const Center(
+                                                    child:
+                                                        CircularProgressIndicator(),
+                                                  );
+                                                },
+                                            errorBuilder:
+                                                (
+                                                  context,
+                                                  error,
+                                                  stackTrace,
+                                                ) {
+                                                  return const Center(
+                                                    child: Icon(
+                                                      Icons.broken_image,
+                                                      size: 48,
+                                                      color:
+                                                          Colors.grey,
+                                                    ),
+                                                  );
+                                                },
+                                          ),
+                                    ),
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets
+                                              .all(12),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons
+                                                .speed,
+                                            color: Colors
+                                                .blue[800],
+                                          ),
+                                          const SizedBox(
+                                            width: 8,
+                                          ),
+                                          const Expanded(
+                                            child: Text(
+                                              'Foto de odómetro de evidencia',
+                                              style:
+                                                  TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.bold,
+                                                    fontSize:
+                                                        14,
+                                                  ),
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons
+                                                .zoom_in,
+                                            color: Colors
+                                                .blue[600],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
 
                     const SizedBox(height: 24),
 
@@ -701,6 +982,140 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                       },
                     ),
 
+                    const SizedBox(height: 24),
+
+                    // 4. RESEÑAS DEL ARRENDATARIO
+                    _buildSectionTitle('Reseñas del Arrendatario'),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(widget.tenantId)
+                          .collection('reviews')
+                          .where('roleEvaluated', isEqualTo: 'tenant')
+                          .snapshots(),
+                      builder: (context, reviewSnapshot) {
+                        if (reviewSnapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+
+                        final docs = reviewSnapshot.data?.docs ?? [];
+                        double average = 0.0;
+                        int total = docs.length;
+
+                        if (total > 0) {
+                          double sum = 0;
+                          for (var doc in docs) {
+                            final data =
+                                doc.data() as Map<String, dynamic>;
+                            sum +=
+                                (data['rating'] as num?)?.toDouble() ??
+                                0.0;
+                          }
+                          average = sum / total;
+                        }
+
+                        return InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ResenasUsuarioScreen(
+                                  userId: widget.tenantId,
+                                  role: 'tenant',
+                                ),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 30,
+                                    backgroundColor: Colors.blue[100],
+                                    child: Icon(
+                                      Icons.person,
+                                      size: 30,
+                                      color: Colors.blue[800],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Calificaciones como arrendatario',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF263238),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        if (total > 0)
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.star,
+                                                color: Colors.amber,
+                                                size: 18,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                average
+                                                    .toStringAsFixed(1),
+                                                style: const TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              Text(
+                                                ' ($total reseñas)',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        else
+                                          Text(
+                                            'Sin reseñas aún',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    color: Colors.grey[400],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -710,8 +1125,7 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           bottomNavigationBar:
               (status == 'pending' ||
                   status == 'approved' ||
-                  status == 'in_progress' ||
-                  status == 'completed')
+                  status == 'in_progress')
               ? _buildActionButtons(context, status)
               : null,
         );
@@ -947,57 +1361,6 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                 ],
               ),
             ],
-          ),
-        ),
-      );
-    }
-
-    if (status == 'completed') {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CalificarViajeScreen(
-                      rentalId: widget.rentalId,
-                      targetUserId: widget.tenantId,
-                      role: 'owner',
-                    ),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1565C0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.star_border, color: Colors.white),
-              label: const Text(
-                'Calificar Usuario',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
           ),
         ),
       );
