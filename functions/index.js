@@ -1,14 +1,15 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
+const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const logger = require("firebase-functions/logger");
 
 // Inicializamos el SDK de Firebase Admin para interactuar con Firestore y Messaging
 admin.initializeApp();
 
-// IMPORTANTE: Usa variables de entorno para los secretos en lugar de escribirlos aquí
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY || "sk_test_reemplazar_con_tu_clave");
+// Definimos el secreto de Stripe
+const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 
 // Limitamos las instancias para evitar cobros sorpresa (buena práctica)
 setGlobalOptions({ maxInstances: 10 });
@@ -18,7 +19,7 @@ setGlobalOptions({ maxInstances: 10 });
  * Este backend crea el secreto seguro que la app de Flutter necesita para mostrar
  * la pasarela de pagos, garantizando que nadie pueda manipular el monto de cobro.
  */
-exports.createPaymentIntent = onCall(async (request) => {
+exports.createPaymentIntent = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   // 1. Verificamos que el usuario esté autenticado (Medida de seguridad fuerte)
   if (!request.auth) {
     throw new HttpsError(
@@ -28,6 +29,7 @@ exports.createPaymentIntent = onCall(async (request) => {
   }
 
   try {
+    const stripe = require("stripe")(stripeSecretKey.value());
     const { amount, currency, ownerId } = request.data;
     const amountInCents = Math.round(amount * 100);
 
@@ -73,7 +75,7 @@ exports.createPaymentIntent = onCall(async (request) => {
  * Endpoint para CAPTURAR (Cobrar) el monto final exacto de un PaymentIntent retenido
  * al finalizar un viaje. Esto liberará automáticamente la diferencia sobrante.
  */
-exports.capturePayment = onCall(async (request) => {
+exports.capturePayment = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Debes iniciar sesión para cobrar.");
   }
@@ -85,7 +87,10 @@ exports.capturePayment = onCall(async (request) => {
   }
 
   try {
+    const stripe = require("stripe")(stripeSecretKey.value());
     const finalAmountInCents = Math.round(finalAmount * 100);
+    logger.info(`Capturing payment ${paymentIntentId} for ${finalAmountInCents} cents`);
+    
     const payload = {
       amount_to_capture: finalAmountInCents, // Monto REAL consumido
     };
@@ -103,7 +108,8 @@ exports.capturePayment = onCall(async (request) => {
 
     const intent = await stripe.paymentIntents.capture(paymentIntentId, payload);
 
-    return { success: true, status: intent.status };
+    logger.info(`Payment captured successfully. Status: ${intent.status}, Amount captured: ${intent.amount_captured}`);
+    return { success: true, status: intent.status, amountCaptured: intent.amount_captured };
   } catch (error) {
     logger.error("Error al capturar los fondos:", error);
     throw new HttpsError("internal", "Error al capturar los fondos: " + error.message);
@@ -114,7 +120,7 @@ exports.capturePayment = onCall(async (request) => {
  * Endpoint para CANCELAR (Liberar) un PaymentIntent retenido.
  * Útil cuando el arrendador rechaza la solicitud de renta.
  */
-exports.cancelPayment = onCall(async (request) => {
+exports.cancelPayment = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Debes iniciar sesión para cancelar un pago.");
   }
@@ -125,6 +131,7 @@ exports.cancelPayment = onCall(async (request) => {
   }
 
   try {
+    const stripe = require("stripe")(stripeSecretKey.value());
     const intent = await stripe.paymentIntents.cancel(paymentIntentId);
     return { success: true, status: intent.status };
   } catch (error) {

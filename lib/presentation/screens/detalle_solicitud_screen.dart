@@ -165,34 +165,59 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
     String newStatus, {
     double? finalDistance,
     double? pricePerKm,
+    double? estimatedTotal,
   }) async {
     try {
       final Map<String, dynamic> updates = {'status': newStatus};
 
       // Si el viaje se finaliza, hacemos el corte para fijar el precio real a cobrar
-      if (newStatus == 'completed' &&
-          finalDistance != null &&
-          pricePerKm != null) {
-        final double basePay = finalDistance * pricePerKm;
-        final double commission = basePay * 0.20;
-        final double finalTotal = basePay + commission;
-        
-        updates['finalBasePay'] = basePay;
-        updates['finalCommission'] = commission;
-        updates['finalTotalPay'] = finalTotal;
+      if (newStatus == 'completed') {
+        // Calcular monto final: si tenemos precio por km, usarlo; si no, usar el estimado
+        double finalTotal;
+        if (pricePerKm != null && pricePerKm > 0 && finalDistance != null && finalDistance > 0) {
+          final double basePay = finalDistance * pricePerKm;
+          final double commission = basePay * 0.20;
+          finalTotal = basePay + commission;
+          updates['finalBasePay'] = basePay;
+          updates['finalCommission'] = commission;
+          updates['finalTotalPay'] = finalTotal;
+        } else {
+          // Fallback: usar el total estimado original (renta por día)
+          finalTotal = estimatedTotal ?? 0;
+          updates['finalBasePay'] = finalTotal / 1.20; // Quitar comisión 20%
+          updates['finalCommission'] = finalTotal - updates['finalBasePay'];
+          updates['finalTotalPay'] = finalTotal;
+        }
 
-        // Capturar el pago real en Stripe (solo lo consumido, el deposito se libera)
+        // Capturar el pago real en Stripe
+        if (finalTotal > 0) {
+          final String paymentId = widget.rentalData['stripePaymentIntentId'] ?? '';
+          if (paymentId.isNotEmpty) {
+            try {
+              final functions = FirebaseFunctions.instance;
+              final callable = functions.httpsCallable('capturePayment');
+              final result = await callable.call({
+                'paymentIntentId': paymentId,
+                'finalAmount': finalTotal,
+              });
+              debugPrint('Stripe capture result: ${result.data}');
+            } catch (e) {
+              debugPrint('Error al capturar pago en Stripe: $e');
+            }
+          }
+        }
+      }
+
+      // Cancelar pre-autorización en Stripe si se rechaza o cancela
+      if (newStatus == 'cancelled' || newStatus == 'rejected') {
         final String paymentId = widget.rentalData['stripePaymentIntentId'] ?? '';
         if (paymentId.isNotEmpty) {
           try {
-            final functions = FirebaseFunctions.instance;
-            final callable = functions.httpsCallable('capturePayment');
-            await callable.call({
+            await FirebaseFunctions.instance.httpsCallable('cancelPayment').call({
               'paymentIntentId': paymentId,
-              'finalAmount': finalTotal,
             });
           } catch (e) {
-            debugPrint('Error al capturar pago en Stripe: $e');
+            debugPrint('Error al cancelar pago en Stripe: $e');
           }
         }
       }
@@ -268,8 +293,40 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
             ),
             actions: [
               TextButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  // Descargar y abrir el contrato PDF
+                  try {
+                    final ref = FirebaseStorage.instance
+                        .ref('global_contracts/contracto_global.pdf');
+                    final url = await ref.getDownloadURL();
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PDFViewerScreen(url: url, title: 'Contrato de Renta'),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No hay contrato disponible. Solicítalo al administrador.'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Ver Contrato'),
+              ),
+              ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Entendido'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1565C0),
+                ),
+                child: const Text('Entendido', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -354,18 +411,23 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           .collection('rentals')
           .doc(widget.rentalId)
           .get();
-          
+      
+      final data = docData.data();
       final double distance =
-          (docData.data()?['distanciaRecorridaKm'] ?? 0).toDouble();
-      final double price =
-          (docData.data()?['pricePerKm'] ?? docData.data()?['price'] ?? 0)
-              .toDouble();
+          (data?['distanciaRecorridaKm'] ?? 0).toDouble();
+      
+      // Usar estimatedTotal (lo que se cobró) si pricePerKm no existe
+      final double priceKm =
+          (data?['pricePerKm'] ?? 0).toDouble();
+      final double estimatedTotal =
+          (data?['estimatedTotal'] ?? 0).toDouble();
 
       _updateStatus(
         context,
         'completed',
         finalDistance: distance,
-        pricePerKm: price,
+        pricePerKm: priceKm,
+        estimatedTotal: estimatedTotal,
       );
     }
   }
@@ -580,56 +642,134 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                   children: [
                     // 1. HEADER: INFO DEL SOLICITANTE
                     _buildSectionTitle('Solicitante'),
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundColor: Colors.blue[100],
-                              child: Text(
-                                initial,
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue[800],
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(widget.tenantId)
+                          .collection('reviews')
+                          .where('roleEvaluated', isEqualTo: 'tenant')
+                          .snapshots(),
+                      builder: (context, reviewSnapshot) {
+                        double average = 0.0;
+                        int total = 0;
+                        if (reviewSnapshot.hasData) {
+                          final docs = reviewSnapshot.data!.docs;
+                          total = docs.length;
+                          if (total > 0) {
+                            double sum = 0;
+                            for (var doc in docs) {
+                              final rData = doc.data() as Map<String, dynamic>;
+                              sum += (rData['rating'] as num?)?.toDouble() ?? 0.0;
+                            }
+                            average = sum / total;
+                          }
+                        }
+
+                        return InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ResenasUsuarioScreen(
+                                  userId: widget.tenantId,
+                                  role: 'tenant',
                                 ),
                               ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    fullName,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF263238),
+                                  CircleAvatar(
+                                    radius: 30,
+                                    backgroundColor: Colors.blue[100],
+                                    child: Text(
+                                      initial,
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue[800],
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  _buildInfoRow(Icons.email_outlined, email),
-                                  const SizedBox(height: 4),
-                                  _buildInfoRow(Icons.phone_outlined, phone),
-                                  const SizedBox(height: 4),
-                                  _buildInfoRow(
-                                    Icons.location_on_outlined,
-                                    address,
-                                    maxLines: 2,
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                fullName,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF263238),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (total > 0)
+                                              Row(
+                                                children: [
+                                                  const Icon(Icons.star, color: Colors.amber, size: 18),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    average.toStringAsFixed(1),
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    ' ($total)',
+                                                    style: const TextStyle(
+                                                      color: Colors.grey,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            if (total == 0)
+                                              const Text(
+                                                'Nuevo',
+                                                style: TextStyle(
+                                                  color: Colors.green,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        _buildInfoRow(Icons.email_outlined, email),
+                                        const SizedBox(height: 4),
+                                        _buildInfoRow(Icons.phone_outlined, phone),
+                                        const SizedBox(height: 4),
+                                        _buildInfoRow(
+                                          Icons.location_on_outlined,
+                                          address,
+                                          maxLines: 2,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 24),
@@ -710,6 +850,53 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                               ),
                             ],
                           ],
+                        ),
+                      ),
+                    ),
+
+                    // BOTÓN DE CONTRATO
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          try {
+                            final ref = FirebaseStorage.instance
+                                .ref('global_contracts/contracto_global.pdf');
+                            final url = await ref.getDownloadURL();
+                            if (context.mounted) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PDFViewerScreen(url: url, title: 'Contrato de Renta'),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('No hay contrato disponible. Solicítalo al administrador.'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.description, color: Color(0xFF1565C0)),
+                        label: const Text(
+                          'Ver Contrato',
+                          style: TextStyle(
+                            color: Color(0xFF1565C0),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFF1565C0)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
@@ -978,140 +1165,6 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                               ],
                             ),
                           ],
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // 4. RESEÑAS DEL ARRENDATARIO
-                    _buildSectionTitle('Reseñas del Arrendatario'),
-                    StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(widget.tenantId)
-                          .collection('reviews')
-                          .where('roleEvaluated', isEqualTo: 'tenant')
-                          .snapshots(),
-                      builder: (context, reviewSnapshot) {
-                        if (reviewSnapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-                        }
-
-                        final docs = reviewSnapshot.data?.docs ?? [];
-                        double average = 0.0;
-                        int total = docs.length;
-
-                        if (total > 0) {
-                          double sum = 0;
-                          for (var doc in docs) {
-                            final data =
-                                doc.data() as Map<String, dynamic>;
-                            sum +=
-                                (data['rating'] as num?)?.toDouble() ??
-                                0.0;
-                          }
-                          average = sum / total;
-                        }
-
-                        return InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ResenasUsuarioScreen(
-                                  userId: widget.tenantId,
-                                  role: 'tenant',
-                                ),
-                              ),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(16),
-                          child: Card(
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 30,
-                                    backgroundColor: Colors.blue[100],
-                                    child: Icon(
-                                      Icons.person,
-                                      size: 30,
-                                      color: Colors.blue[800],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Calificaciones como arrendatario',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF263238),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        if (total > 0)
-                                          Row(
-                                            children: [
-                                              const Icon(
-                                                Icons.star,
-                                                color: Colors.amber,
-                                                size: 18,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                average
-                                                    .toStringAsFixed(1),
-                                                style: const TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold,
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                              Text(
-                                                ' ($total reseñas)',
-                                                style: TextStyle(
-                                                  color: Colors.grey[600],
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        else
-                                          Text(
-                                            'Sin reseñas aún',
-                                            style: TextStyle(
-                                              color: Colors.grey[600],
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  Icon(
-                                    Icons.chevron_right,
-                                    color: Colors.grey[400],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
                         );
                       },
                     ),

@@ -129,21 +129,28 @@ class RentarAutoScreen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                color: isFee ? Colors.grey[700] : Colors.black87,
+        Flexible(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isFee ? Colors.grey[700] : Colors.black87,
+                  ),
+                ),
               ),
-            ),
-            if (isFee) ...[
-              const SizedBox(width: 6),
-              Icon(Icons.info_outline, size: 16, color: Colors.grey[400]),
+              if (isFee) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.info_outline, size: 14, color: Colors.grey[400]),
+              ],
             ],
-          ],
+          ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: TextStyle(
@@ -522,7 +529,7 @@ class RentarAutoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     _buildPriceRow(
-                      'Depósito de seguridad (se devuelve)',
+                      'Depósito seguridad',
                       '\$${securityDeposit.toStringAsFixed(2)}',
                       isFee: true,
                     ),
@@ -535,17 +542,19 @@ class RentarAutoScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Total a Retener en Tarjeta',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                        const Flexible(
+                          child: Text(
+                            'Total a Retener',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         Text(
                           '\$${totalWithDeposit.toStringAsFixed(2)}',
                           style: const TextStyle(
-                            fontSize: 22,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1565C0),
                           ),
@@ -684,103 +693,7 @@ class RentarAutoScreen extends StatelessWidget {
             height: 250,
             child: Stack(
               children: [
-                PageView(
-                  children: [
-                    // Imagen Real del auto
-                    CarImageLoader(autoId: autoId, fit: BoxFit.cover),
-                    // Imágenes de ejemplo (Vacías por ahora)
-                    Container(
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 48,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Vista Interior',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Container(
-                      color: Colors.grey[200],
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 48,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Vista Lateral',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Container(
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 48,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Vista Trasera',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                // Indicador de "Varias fotos"
-                Positioned(
-                  bottom:
-                      40, // Justo encima del contenido blanco que empieza en top:220 (250 - 40 = 210 visualmente)
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.photo_camera, color: Colors.white, size: 14),
-                        SizedBox(width: 4),
-                        Text(
-                          '1/4', // Estático por ahora
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                CarImageLoader(autoId: autoId, fit: BoxFit.cover),
               ],
             ),
           ),

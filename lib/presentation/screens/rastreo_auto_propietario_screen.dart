@@ -54,7 +54,6 @@ class _RastreoAutoPropietarioScreenState
           // Recuperar kmLimit para calcular el límite de 500km
           final double kmLimit = (data['kmLimit'] ?? 500).toDouble();
           final double kmOverage = distancia > kmLimit ? distancia - kmLimit : 0;
-          final double extraKmCharge = kmOverage * pricePerKm;
           
           final double gananciaAcumulada = distancia * pricePerKm;
 
@@ -257,26 +256,6 @@ class _RastreoAutoPropietarioScreenState
                                         ),
                                         Text(
                                           '${kmOverage.toStringAsFixed(2)} km',
-                                          style: TextStyle(
-                                            color: Colors.red[900],
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Cargo Extra:',
-                                          style: TextStyle(
-                                            color: Colors.red[900],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        Text(
-                                          '\$${extraKmCharge.toStringAsFixed(2)} MXN',
                                           style: TextStyle(
                                             color: Colors.red[900],
                                             fontWeight: FontWeight.bold,
