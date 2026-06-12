@@ -20,6 +20,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
   // Filtros seleccionados
   String? _selectedBrand;
   RangeValues _priceRange = const RangeValues(0, 2000);
+  double _maxRadiusKm = 50.0;
   
   // Ubicación y distancias
   Position? _currentPosition;
@@ -311,7 +312,12 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
           final matchesPrice =
               price >= _priceRange.start && price <= _priceRange.end;
 
-          return matchesSearch && matchesBrand && matchesPrice;
+          // Filtro de distancia (solo si tenemos ubicación del owner)
+          final ownerId = data['userId']?.toString();
+          final dist = ownerId != null ? _ownerDistances[ownerId] : null;
+          final matchesRadius = dist == null || dist < 0 || dist <= _maxRadiusKm;
+
+          return matchesSearch && matchesBrand && matchesPrice && matchesRadius;
         }).toList();
 
         // --- ORDENAR POR DISTANCIA Y OBTENER UBICACIONES FALTANTES ---
@@ -588,6 +594,7 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
 
   void _showFilterModal(BuildContext context) {
     RangeValues tempRange = _priceRange;
+    double tempRadius = _maxRadiusKm;
 
     showModalBottomSheet(
       context: context,
@@ -652,12 +659,44 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
                       },
                     ),
                     const SizedBox(height: 24),
+
+                    // --- FILTRO RADIO MÁXIMO ---
+                    const Text(
+                      'Radio máximo de búsqueda',
+                      style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF455A64)),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${tempRadius.round()} km',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: tempRadius,
+                      min: 5,
+                      max: 100,
+                      divisions: 19,
+                      activeColor: const Color(0xFF1565C0),
+                      label: '${tempRadius.round()} km',
+                      onChanged: (double value) {
+                        setModalState(() {
+                          tempRadius = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
                           setState(() {
                             _priceRange = tempRange;
+                            _maxRadiusKm = tempRadius;
                           });
                           Navigator.pop(context);
                         },

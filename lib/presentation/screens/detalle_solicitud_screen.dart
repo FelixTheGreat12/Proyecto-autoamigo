@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'calificar_viaje_screen.dart';
 import 'pdf_viewer_screen.dart';
@@ -64,40 +63,6 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
     return null;
   }
 
-  Future<void> _fetchAndShowContract() async {
-    try {
-      final storageUrl = await FirebaseStorage.instance
-          .ref('global_contracts/contracto_global.pdf')
-          .getDownloadURL();
-      
-      final Uri url = Uri.parse(storageUrl);
-      if (Platform.isAndroid) {
-        final Uri chromeUrl = Uri.parse(
-          'googlechrome://navigate?url=${Uri.encodeComponent(storageUrl)}',
-        );
-        if (await canLaunchUrl(chromeUrl)) {
-          await launchUrl(chromeUrl, mode: LaunchMode.externalApplication);
-          return;
-        }
-      }
-
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudo abrir el enlace.')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Aún no hay un contrato global disponible para imprimir.')),
-        );
-      }
-    }
-  }
 
   final ImagePicker _picker = ImagePicker();
   bool _isUploadingPhoto = false;
@@ -166,6 +131,8 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
     double? finalDistance,
     double? pricePerKm,
     double? estimatedTotal,
+    double? securityDeposit,
+    double? kmLimit,
   }) async {
     try {
       final Map<String, dynamic> updates = {'status': newStatus};
@@ -174,6 +141,11 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
       if (newStatus == 'completed') {
         // Calcular monto final: si tenemos precio por km, usarlo; si no, usar el estimado
         double finalTotal;
+        double amountToCapture;
+        final double deposit = securityDeposit ?? 1500.0;
+        final double limit = kmLimit ?? 500.0;
+        final bool exceededLimit = finalDistance != null && finalDistance > limit;
+
         if (pricePerKm != null && pricePerKm > 0 && finalDistance != null && finalDistance > 0) {
           final double basePay = finalDistance * pricePerKm;
           final double commission = basePay * 0.20;
@@ -181,16 +153,24 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           updates['finalBasePay'] = basePay;
           updates['finalCommission'] = commission;
           updates['finalTotalPay'] = finalTotal;
+          // Si se pasó del límite, cobramos el depósito
+          amountToCapture = exceededLimit ? finalTotal + deposit : finalTotal;
         } else {
           // Fallback: usar el total estimado original (renta por día)
+          // estimatedTotal YA incluye el depósito: renta + comisión + depósito
           finalTotal = estimatedTotal ?? 0;
           updates['finalBasePay'] = finalTotal / 1.20; // Quitar comisión 20%
           updates['finalCommission'] = finalTotal - updates['finalBasePay'];
           updates['finalTotalPay'] = finalTotal;
+          // Si NO se pasó del límite, restamos el depósito del cobro
+          amountToCapture = exceededLimit ? finalTotal : finalTotal - deposit;
         }
 
+        // Asegurar que no cobramos menos de 0
+        if (amountToCapture < 0) amountToCapture = 0;
+
         // Capturar el pago real en Stripe
-        if (finalTotal > 0) {
+        if (amountToCapture > 0) {
           final String paymentId = widget.rentalData['stripePaymentIntentId'] ?? '';
           if (paymentId.isNotEmpty) {
             try {
@@ -198,7 +178,7 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
               final callable = functions.httpsCallable('capturePayment');
               final result = await callable.call({
                 'paymentIntentId': paymentId,
-                'finalAmount': finalTotal,
+                'finalAmount': amountToCapture,
               });
               debugPrint('Stripe capture result: ${result.data}');
             } catch (e) {
@@ -292,35 +272,6 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
               'Recuerda imprimir el contrato e ir a buscar al usuario para iniciar el viaje y darle el auto.',
             ),
             actions: [
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  // Descargar y abrir el contrato PDF
-                  try {
-                    final ref = FirebaseStorage.instance
-                        .ref('global_contracts/contracto_global.pdf');
-                    final url = await ref.getDownloadURL();
-                    if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PDFViewerScreen(url: url, title: 'Contrato de Renta'),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('No hay contrato disponible. Solicítalo al administrador.'),
-                          backgroundColor: Colors.orange,
-                        ),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Ver Contrato'),
-              ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: ElevatedButton.styleFrom(
@@ -343,7 +294,22 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
     }
   }
 
-  Future<void> _confirmDeliveryAndStartRental(BuildContext context) async {
+  Future<void> _confirmDeliveryAndStartRental(BuildContext context, Map<String, dynamic> rentalData) async {
+    final hasOdometerPhoto = rentalData['odometerPhotoUrl'] != null &&
+        (rentalData['odometerPhotoUrl'] as String).isNotEmpty;
+
+    if (!hasOdometerPhoto) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Debes tomar la foto del odómetro antes de confirmar la entrega.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -421,6 +387,10 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
           (data?['pricePerKm'] ?? 0).toDouble();
       final double estimatedTotal =
           (data?['estimatedTotal'] ?? 0).toDouble();
+      final double deposit =
+          (data?['securityDeposit'] ?? 1500).toDouble();
+      final double limit =
+          (data?['kmLimit'] ?? 500).toDouble();
 
       _updateStatus(
         context,
@@ -428,6 +398,8 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
         finalDistance: distance,
         pricePerKm: priceKm,
         estimatedTotal: estimatedTotal,
+        securityDeposit: deposit,
+        kmLimit: limit,
       );
     }
   }
@@ -1179,7 +1151,7 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
               (status == 'pending' ||
                   status == 'approved' ||
                   status == 'in_progress')
-              ? _buildActionButtons(context, status)
+              ? _buildActionButtons(context, status, currentRentalData)
               : null,
         );
       },
@@ -1242,7 +1214,7 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context, String status) {
+  Widget _buildActionButtons(BuildContext context, String status, Map<String, dynamic> currentRentalData) {
     if (status == 'in_progress') {
       return Container(
         padding: const EdgeInsets.all(20),
@@ -1392,7 +1364,7 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _confirmDeliveryAndStartRental(context),
+                      onPressed: () => _confirmDeliveryAndStartRental(context, currentRentalData),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1565C0),
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1436,29 +1408,6 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: _fetchAndShowContract,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF1565C0),
-                  side: const BorderSide(color: Color(0xFF1565C0), width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                icon: const Icon(Icons.article_outlined),
-                label: const Text(
-                  'Ver Contrato',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
