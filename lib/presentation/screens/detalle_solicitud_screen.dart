@@ -840,7 +840,7 @@ class _DetalleSolicitudScreenState extends State<DetalleSolicitudScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => PDFViewerScreen(url: url, title: 'Contrato de Renta'),
+                                  builder: (_) => PDFViewerScreen(url: url, title: 'Contrato de Renta', showDownload: true),
                                 ),
                               );
                             }

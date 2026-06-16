@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'rentar_auto_screen.dart';
@@ -244,29 +245,9 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
   }
 
   Widget _buildResultsList() {
-    // Si no hay búsqueda ni filtro de marca, mostrar mensaje "Empieza a buscar"
-    if (_searchQuery.isEmpty && _selectedBrand == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Escribe una marca o modelo\npara empezar la búsqueda',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-            ),
-          ],
-        ),
-      );
-    }
-
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('autos')
-          // En vez de filtrar aquí, lo procesaremos localmente o usaremos el where de ambas condiciones
-          // where('status', isEqualTo: 'registrado') // <-- Removido para poder mostrar los ocupados
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -290,6 +271,10 @@ class _BuscarAutoScreenState extends State<BuscarAutoScreen> {
           // Mostrar solo autos con tarifa diaria definida.
           // Esto evita que aparezcan tarjetas con esquema legado por km.
           if (data['pricePerDay'] == null) return false;
+
+          // No mostrar autos del propio arrendatario
+          final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+          if (data['userId'] == currentUserId) return false;
 
           final brand = (data['brand'] ?? '').toString();
           final model = (data['model'] ?? '').toString();

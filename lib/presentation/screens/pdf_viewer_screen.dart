@@ -8,8 +8,14 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 class PDFViewerScreen extends StatelessWidget {
   final String url;
   final String title;
+  final bool showDownload;
 
-  const PDFViewerScreen({super.key, required this.url, required this.title});
+  const PDFViewerScreen({
+    super.key,
+    required this.url,
+    required this.title,
+    this.showDownload = false,
+  });
 
   Future<void> _downloadAndOpen(BuildContext context) async {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -65,11 +71,12 @@ class PDFViewerScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1565C0),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
-            tooltip: 'Descargar contrato',
-            onPressed: () => _downloadAndOpen(context),
-          ),
+          if (showDownload)
+            IconButton(
+              icon: const Icon(Icons.download),
+              tooltip: 'Descargar contrato',
+              onPressed: () => _downloadAndOpen(context),
+            ),
         ],
       ),
       body: isImage
