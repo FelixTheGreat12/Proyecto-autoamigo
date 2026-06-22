@@ -192,7 +192,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // No necesitamos para fecha o dirección ya que no tienen validación
 
   final AuthService _authService = AuthService();
-  bool _acceptTerms = false;
 
   // --- AÑADIDO: Método dispose para limpiar ---
   @override
@@ -252,17 +251,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return; // Detener si el formulario no es válido
     }
     // --- FIN DE LA MODIFICACIÓN DE FOCO ---
-
-    // 2. Validar que los términos y condiciones estén aceptados
-    if (!_acceptTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Debes aceptar los Términos y Condiciones'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
 
     // 3. Validar que la fecha de nacimiento esté completa
     if (_selectedDay == null ||
@@ -453,23 +441,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     },
                   ),
                 ]),
-
-                // Checkbox de Términos y Condiciones
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20.0),
-                  child: CheckboxListTile(
-                    value: _acceptTerms,
-                    onChanged: (value) =>
-                        setState(() => _acceptTerms = value ?? false),
-                    title: const Text(
-                      'He leído y acepto los Términos y Condiciones',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    activeColor: const Color(0xFF0D47A1),
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                ),
 
                 // Botones de acción
                 SizedBox(
