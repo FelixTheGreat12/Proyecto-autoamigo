@@ -3,9 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 // Asegúrate de importar tu pantalla de producto
 import 'product_car_screen.dart';
+import 'ver_documentos_auto_screen.dart'; // Importado para visualizar los documentos
+import '../widgets/car_image_loader.dart';
 
 class MisAutosScreen extends StatelessWidget {
-  const MisAutosScreen({super.key});
+  final bool isForDocuments;
+
+  const MisAutosScreen({super.key, this.isForDocuments = false});
 
   @override
   Widget build(BuildContext context) {
@@ -22,9 +26,9 @@ class MisAutosScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: const Text(
-          'Mis Autos',
-          style: TextStyle(
+        title: Text(
+          isForDocuments ? 'Documentos de mis autos' : 'Mis Autos',
+          style: const TextStyle(
             color: Color(0xFF1565C0),
             fontWeight: FontWeight.bold,
           ),
@@ -33,17 +37,18 @@ class MisAutosScreen extends StatelessWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.add_circle_outline,
-              color: Color(0xFF1565C0),
-              size: 28,
+          if (!isForDocuments)
+            IconButton(
+              icon: const Icon(
+                Icons.add_circle_outline,
+                color: Color(0xFF1565C0),
+                size: 28,
+              ),
+              tooltip: 'Agregar auto',
+              onPressed: () {
+                Navigator.pushNamed(context, '/cotizar_auto');
+              },
             ),
-            tooltip: 'Agregar auto',
-            onPressed: () {
-              Navigator.pushNamed(context, '/cotizar_auto');
-            },
-          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -154,35 +159,42 @@ class MisAutosScreen extends StatelessWidget {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProductCarScreen(
-                            autoId: autoId,
-                            carData: autoData,
+                      if (isForDocuments) {
+                        // Navegar a la pantalla de visualización donde solo se leen los PDFs/Imágenes
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VerDocumentosAutoScreen(
+                              autoId: autoId,
+                              brand: brand,
+                              model: model,
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProductCarScreen(
+                              autoId: autoId,
+                              carData: autoData,
+                            ),
+                          ),
+                        );
+                      }
                     },
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Row(
                         children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: iconColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
-                              child: Text(
-                                brand.isNotEmpty ? brand[0].toUpperCase() : 'A',
-                                style: TextStyle(
-                                  color: iconColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 20,
-                                ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: SizedBox(
+                              width: 50,
+                              height: 50,
+                              child: CarImageLoader(
+                                autoId: autoId,
+                                fit: BoxFit.cover,
                               ),
                             ),
                           ),
@@ -216,6 +228,37 @@ class MisAutosScreen extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
+                                    if (autoData['pricePerDay'] != null) ...[
+                                      Icon(
+                                        Icons.attach_money,
+                                        size: 14,
+                                        color: Colors.green[700],
+                                      ),
+                                      Text(
+                                        '${autoData['pricePerDay']}/día',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green[700],
+                                        ),
+                                      ),
+                                    ] else if (autoData['pricePerKm'] !=
+                                        null) ...[
+                                      Icon(
+                                        Icons.attach_money,
+                                        size: 14,
+                                        color: Colors.green[700],
+                                      ),
+                                      Text(
+                                        '${autoData['pricePerKm']}/día (legado)',
+                                        style: TextStyle(
+                                          color: Colors.green[800],
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                    ],
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
@@ -265,54 +308,6 @@ class MisAutosScreen extends StatelessWidget {
             },
           );
         },
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_filled),
-              label: 'Inicio',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.add_circle_outline),
-              label: 'Cotizar',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.map_outlined),
-              label: 'Localizar',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              label: 'Perfil',
-            ),
-          ],
-          currentIndex:
-              1, // Resaltamos "Cotizar" o similar, ya que estamos en gestión
-          backgroundColor: Colors.white,
-          elevation: 0,
-          selectedItemColor: Colors.grey[800],
-          unselectedItemColor: Colors.grey[600],
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          onTap: (index) {
-            if (index == 0) {
-              Navigator.popUntil(context, ModalRoute.withName('/'));
-            }
-            // Otros casos...
-          },
-        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   cloud_firestore: ^6.0.3
+  cached_network_image: ^3.3.0
   file_picker: ^10.3.6
   firebase_app_check: ^0.4.1+2
   firebase_auth: ^6.1.1
@@ -15,6 +16,31 @@ dependencies:
   firebase_storage: ^13.0.3
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_pdfview: ^1.4.4
+  photo_view: ^0.15.0
+  syncfusion_flutter_pdfviewer: ^32.2.5
+  url_launcher: ^6.3.2
+  google_maps_flutter: ^2.14.2
+  geocoding: ^4.0.0
+  geolocator: ^14.0.2
+  firebase_messaging: ^16.1.3
+  flutter_stripe: ^12.5.0
+  cloud_functions: ^6.1.0
+  flutter_foreground_task: ^9.2.2
+  flutter_local_notifications: ^20.1.0
+  image_picker: ^1.2.2
+  flutter_native_splash: ^2.4.7
+  open_filex: ^4.7.0
+  path_provider: ^2.1.5
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/images/logo.png
+  android_12:
+    image: assets/images/logo.png
+    icon_background_color: "#FFFFFF"
 
 dev_dependencies:
   flutter_lints: ^5.0.0
@@ -23,3 +49,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/

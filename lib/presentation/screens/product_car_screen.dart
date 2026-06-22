@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'cotizar_auto_screen.dart'; // Para navegar a editar
-import '../services/file_upload_service.dart'; // Para borrar archivos
+import '../../services/file_upload_service.dart'; // Para borrar archivos
+import '../widgets/car_image_loader.dart';
 
 class ProductCarScreen extends StatelessWidget {
   final String autoId;
@@ -28,7 +29,7 @@ class ProductCarScreen extends StatelessWidget {
         return docs['Fotos del vehículo'] as String?;
       }
     } catch (e) {
-      print('Error obteniendo imagen: $e');
+      debugPrint('Error obteniendo imagen: $e');
     }
     return null;
   }
@@ -142,6 +143,8 @@ class ProductCarScreen extends StatelessWidget {
     final brand = carData['brand'] ?? 'N/A';
     final model = carData['model'] ?? 'N/A';
     final year = carData['year'] ?? 'N/A';
+    final color = carData['color'] ?? 'N/A';
+    final transmission = carData['transmission'] ?? 'N/A';
     final plate = carData['plate'] ?? 'N/A';
 
     return Scaffold(
@@ -215,60 +218,30 @@ class ProductCarScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Imagen con indicador de carga circular
-            FutureBuilder<String?>(
-              future: _getCarImageUrl(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return _buildImagePlaceholder(isLoading: true);
-                }
-                final imageUrl = snapshot.data;
-                if (imageUrl == null) {
-                  return _buildImagePlaceholder(isLoading: false);
-                }
-                return Container(
-                  width: double.infinity,
+            Container(
+              width: double.infinity,
+              height: 250,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.2),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect( 
+                borderRadius: BorderRadius.circular(16),
+                child: CarImageLoader(
+                  autoId: autoId,
                   height: 250,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.2),
-                        spreadRadius: 2,
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(
-                            Icons.broken_image,
-                            size: 50,
-                            color: Colors.grey,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -305,7 +278,26 @@ class ProductCarScreen extends StatelessWidget {
                   const Divider(height: 24),
                   _buildInfoRow(Icons.calendar_today, 'Año', year),
                   const Divider(height: 24),
+                  _buildInfoRow(Icons.palette, 'Color', color),
+                  const Divider(height: 24),
+                  _buildInfoRow(Icons.settings, 'Transmisión', transmission),
+                  const Divider(height: 24),
                   _buildInfoRow(Icons.confirmation_number, 'Placas', plate),
+                  if (carData['pricePerDay'] != null) ...[
+                    const Divider(height: 24),
+                    _buildInfoRow(
+                      Icons.attach_money,
+                      'Precio por día',
+                      '\$${carData['pricePerDay']} MXN',
+                    ),
+                  ] else if (carData['pricePerKm'] != null) ...[
+                    const Divider(height: 24),
+                    _buildInfoRow(
+                      Icons.attach_money,
+                      'Precio por día (dato legado)',
+                      '\$${carData['pricePerKm']} MXN',
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -361,8 +353,11 @@ class ProductCarScreen extends StatelessWidget {
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.directions_car_outlined,
-                      size: 64, color: Colors.grey[400]),
+                  Icon(
+                    Icons.directions_car_outlined,
+                    size: 64,
+                    color: Colors.grey[400],
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'Sin imagen disponible',
